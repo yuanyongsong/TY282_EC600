@@ -250,7 +250,7 @@ u8 G_Sensor_init(void)
 	//核对 id
 	add = 0x01;
 	buf = 0;
-	ret = G_Sensor_Write(add, buf);
+	ret = G_Sensor_Read(add, &buf);
 	if ((0x13 != buf) || (1 == ret))
 	{
 		f = FALSE;
@@ -290,12 +290,27 @@ u8 G_Sensor_init(void)
 
 	//将加速度中断映射到中断脚
 	add = 0x19;
-	buf = 04;
+	buf = 0x04;
 	if (TRUE == f && (1 == (ret = G_Sensor_Write(add, buf))))
 	{
 		f = FALSE;
 	}	
 
+	//配置锁存时间为25ms
+	add = 0x21;
+	buf = 0x00;
+	if (TRUE == f && (1 == (ret = G_Sensor_Write(add, buf))))
+	{
+		f = FALSE;
+	}
+
+		//配置推拉输出，高电平有效
+	add = 0x20;
+	buf = 0x01;
+	if (TRUE == f && (1 == (ret = G_Sensor_Write(add, buf))))
+	{
+		f = FALSE;
+	}
 	return f;
 }
 

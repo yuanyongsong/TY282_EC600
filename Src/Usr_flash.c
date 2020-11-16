@@ -96,7 +96,7 @@ static void FS_FactroyValue(void)
 	Fs.BkSendLen = 0;
 	Fs.Interval = 120;
 	Fs.HaveSetApn = 0;
-	Fs.Sensor = 4;
+	Fs.Sensor = 0x10;
 
 	Flag.HaveGetMccMnc = 0;
 }

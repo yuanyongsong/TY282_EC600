@@ -46,7 +46,6 @@ void time_convert(void)
 }
 
 int main(void)
-
 {
 	time_convert();
 	Usr_InitHardware();
@@ -85,11 +84,6 @@ void Usr_InitHardware(void)
 	UART_Init();
 	TIMER_Init();
 	IIC_Init();
-	if(G_Sensor_init())
-	{
-		printf("G sensor init ok\r\n");
-	}
-//	EXFLASH_SpiInit();
 }
 
 
@@ -145,6 +139,12 @@ void Usr_InitValue(void)
 		Flag.ModuleHasCA = 1;
 	}
 
+	//如果灵敏度值过低，例如等于0，传感器会一直输出高电平，单片机无法检测到中断
+	if(Fs.Sensor < 0x02)		
+	{
+		Fs.Sensor = 0x4;
+	}
+
 	if (Fs.Interval == 0 || Fs.Interval == 0xffff)
 	{
 		Fs.Interval = 120;
@@ -172,7 +172,12 @@ void Usr_InitValue(void)
 	memset(UserIDBuf,0, sizeof(UserIDBuf));
 	strncpy(UserIDBuf,Fs.UserID, sizeof(UserIDBuf)); 
 
+	//以下是需要获取到配置参数才能初始化的设备外设
 	RTC_Wake_Init(300);		//五分钟产生一次闹钟事件
+	if(G_Sensor_init())
+	{
+		printf("G sensor init ok\r\n");
+	}
 }
 
 void Flag_Check(void)

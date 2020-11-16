@@ -28,9 +28,6 @@
 #define SPK_POWER_SET           LL_GPIO_SetOutputPin(GPIOA,LL_GPIO_PIN_1)
 #define SPK_POWER_RESET         LL_GPIO_ResetOutputPin(GPIOA,LL_GPIO_PIN_1)	  
 
-#define GPS_ANTE_POWER_SET      LL_GPIO_SetOutputPin(GPIOA,LL_GPIO_PIN_8)
-#define GPS_ANTE_POWER_RESET    LL_GPIO_ResetOutputPin(GPIOA,LL_GPIO_PIN_8)
-
 #define NRF52_WAKEUP_SET        LL_GPIO_SetOutputPin(GPIOD,LL_GPIO_PIN_10)
 #define NRF52_WAKEUP_RESET      LL_GPIO_ResetOutputPin(GPIOD,LL_GPIO_PIN_10)
 
