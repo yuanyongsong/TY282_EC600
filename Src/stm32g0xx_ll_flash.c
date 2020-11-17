@@ -16,17 +16,6 @@ void LL_FLASH_Program_Word(uint32_t flash_addr,uint32_t data)
 
 void LL_Flash_Unlock(void)
 {
-    #if 0
-	while (LL_FLASH_IsActiveFlag_BSY())  
-	{
-	} 
-
-	if (LL_FLASH_LockState()) 
-	{ 
-		LL_FLASH_SetKey(FLASH_KEY1);
-		LL_FLASH_SetKey(FLASH_KEY2);
-	}
-    #else
     if((FLASH->CR & FLASH_CR_LOCK) != RESET)
     {
         /* Authorize the FLASH Registers access */
@@ -39,7 +28,6 @@ void LL_Flash_Unlock(void)
         FLASH->OPTKEYR = FLASH_OPTKEY1;
         FLASH->OPTKEYR = FLASH_OPTKEY2;
     }     
-    #endif
 }
 
 

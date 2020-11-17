@@ -432,16 +432,6 @@ void FLASH_WaitForWriteEnd(void)
 }
 
 
-void Spi_Flash_Test(void)
-{	
-	uint32_t flashID = 0;
-
-	flashID = FLASH_ReadID();
-	if(flashID == 0xEF4017)
-	{
-		  printf("\r\n W25Q64 Init OK\r\n");
-	}
-}
 
 void EXFLASH_Init(void)
 {
@@ -453,7 +443,7 @@ void EXFLASH_Init(void)
 void EXFLSAH_SaveBreakPoint(void)
 {
     //已达到最大断点保存数目，并且没有上传完，不再保存新断点
-    if(Fs.BKSavedCnt>=500 && Fs.BKSavedCnt!=Fs.BkSendCnt) return;  
+    if(Fs.BKSavedCnt>=100 && Fs.BKSavedCnt!=Fs.BkSendCnt) return;  
     
     
     //如果保存的断点已经上传完或没保存断点,格式化flash

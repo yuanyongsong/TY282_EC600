@@ -5,10 +5,9 @@
 
 #define STM32_FLASH_SIZE 128 	 		//所选STM32的FLASH容量大小(单位为K)
 #define STM32_FLASH_BASE 0x08000000 	//STM32 FLASH的起始地址
+#define BEAKPIONT_ADDR	 0X08020000 - 0x2800	//断点存储位置起始，在最后10k地址处，大小8k用于存放断点
 
 //设置FLASH保存数据地址(必须为偶数)
-//FLASH的起始地址为0X8000000，STM32103FRC的flash大小为256k(0x40000),预留保存数据的空间大小为2k(0x800)
-//所以地址为0X8000000+0x40000-0x800=0X0803F800
 #define FLASH_SAVE_ADDR  0X08020000 - 0x800		//STMG070RB flash为128K，使用末尾2K作为数据存储区
 
 
@@ -38,7 +37,8 @@ typedef struct{
 	unsigned short  BkSendCnt;          //已发断点计数
 	unsigned int  	BkSendLen;          //已发断点字长计数，单位byte
 	unsigned short  Interval;           //定位包上传间隔	
-
+	unsigned short  testcnt0;           //定位包上传间隔	
+	unsigned short  testcnt1;           //定位包上传间隔	
 }FS;
 #endif
 

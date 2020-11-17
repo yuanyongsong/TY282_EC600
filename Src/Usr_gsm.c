@@ -34,9 +34,6 @@ sleep:
 
 	if(Flag.IrNoNeedWakeUp)
 	{
-		// SystemClock_Config();
-		// UART_Init();
-		// LL_mDelay(100);
 		goto sleep;
 	}
 #if 1
@@ -54,7 +51,6 @@ sleep:
 
 void Usr_ModuleWakeUp(void)
 {
-	u8 at_retry = 3;
 
 	if (!Flag.ModuleWakeup)
 		return;
