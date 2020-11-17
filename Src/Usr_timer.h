@@ -3,7 +3,7 @@
 
 #include "usr_main.h"
 
-#define ACTIVE_TIME 120
+#define ACTIVE_TIME 60
 
 extern unsigned char baseTimeSec;
 extern unsigned int  baseSecCnt;

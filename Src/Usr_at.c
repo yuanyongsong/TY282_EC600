@@ -145,7 +145,7 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		break;
 
 	case AT_QNTP:
-		strcpy(pDst, "AT+QNTP=3,\"ntp1.aliyun.com\",32\r\n");
+		strcpy(pDst, "AT+QNTP=3,\"ntp1.aliyun.com\",123\r\n");
 		TIMER_AtDelay(3);
 		break;
 
@@ -573,13 +573,8 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			back = 1;
 
 		}
-		else if (strstr(pSrc, "OK"))
+		else 
 		{
-			back = 1;
-		}
-		else
-		{
-
 			AtDelayCnt = 0;
 			*temType = AT_NULL;
 			back = 1;
@@ -1168,7 +1163,7 @@ void Flag_check(void)
 		return;
 	}
 
-	if(Flag.NeedSetNtp && Flag.PsSignalOk)
+	if(Flag.NeedSetNtp && Flag.GprsConnectOk)
 	{
 		Flag.NeedSetNtp = 0;
 		AtType = AT_QNTP;

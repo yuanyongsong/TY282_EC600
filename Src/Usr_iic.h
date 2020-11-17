@@ -25,6 +25,7 @@ void SHT31_Test(void);
 uint8_t I2C_Master_Read(u8 deviceId,u8 *register_buf,u8 register_len,u8 *read_buf,u8 read_len);
 uint8_t I2C_Master_Write(u8 deviceId,u8 *register_buf,u8 register_len,u8 *write_buf,u8 write_len);
 u8 G_Sensor_init(void);
+void G_Sensor_Pwr(u8 state);
 #endif
 
 

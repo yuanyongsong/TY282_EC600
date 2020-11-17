@@ -17,16 +17,15 @@ void Usr_ModuleGoSleep(void)
 	Flag.ModuleWakeup = 0;
 	Flag.Insleeping = 1;
 	Flag.ModuleSleep = 1;
-	Flag.IrNoNeedWakeUp = 1;
-
+	Flag.NeedModuleOff = 1;
 	GREEN_OFF;
 	RED_OFF;
-	MODULE_WAKEUP_RESET;
-
+	Usr_ModuleTurnOff();
 	printf("\r\nsystem sleep!\r\n");
 	LL_mDelay(100);		//留一个时间窗口给串口打印数据
-//	POWER_OFF;
-
+	POWER_OFF;
+	GPS_OFF;
+	G_Sensor_Pwr(0);
 	Sys_Setting_Before_StopMode();
 sleep:
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
@@ -40,16 +39,16 @@ sleep:
 		// LL_mDelay(100);
 		goto sleep;
 	}
-#if 0
+#if 1
 	Usr_InitHardware();
-	POWER_ON;
+	G_Sensor_Pwr(1);
 #else
     SystemClock_Config();
 	StopMode_TurnOn_Some_GPIOs();
 	UART_Init();
 	TIMER_Init();
 	IIC_Init();
-	EXFLASH_SpiInit();
+//	EXFLASH_SpiInit();
 #endif
 }
 
@@ -67,23 +66,13 @@ void Usr_ModuleWakeUp(void)
 
 	GprsSend.posCnt = 1;
 	GprsSend.posFlag = 1;
+	Flag.NeedModuleOn = 1;
 
-	MODULE_WAKEUP_SET;
 	LL_mDelay(200);
 
 	printf("\r\nmodule wake up!\r\n");
 	Flag.ModuleSleep = 0;
 	Flag.NeedSendToSleep = 1;
-
-	//有的时候发送的第一条指令不回复，需要先重复发送几个AT
-	AtType = AT_AT;
-	while(at_retry)
-	{
-		AT_SendPacket(AtType, AtSendbuf);
-		UART_Send(AT_PORT, (u8 *)AtSendbuf, strlen(AtSendbuf));	
-		LL_mDelay(500);
-		at_retry --;
-	}
 	AtType = AT_NULL;
 }
 
@@ -118,12 +107,13 @@ void Usr_ModuleTurnOn(void)
 	delay_ms(300);
 
 	delay_ms(2000);		//延时两秒，之后准备连续发送AT指令唤醒模块
-	Flag.NeedWakeMdByAt = 1;
+//	Flag.NeedWakeMdByAt = 1;
 	Flag.RcvAtAckOK = 0;
 	Flag.HaveSmsReady = 0;
 	Flag.HaveGetCCID = 1;
 	Flag.PwrOnModule = 1;
 	Flag.NeedSetNtp = 1;
+	Flag.AtInitFinish = 0;
 
 	ActiveTimer = ACTIVE_TIME;	//模块开机后需要较长时间的初始化和联网，保证进入休眠前完成这些操作
 }

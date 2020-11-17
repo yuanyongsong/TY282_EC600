@@ -141,16 +141,14 @@ void GPIO_init(void)
     LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 
-    if(Flag.Insleeping == 0)
-    {
-        GPIO_InitStruct.Pin = LL_GPIO_PIN_7;
-        GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
-        GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
-        GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-        GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-        LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-    }
 
+    GPIO_InitStruct.Pin = LL_GPIO_PIN_7;
+    GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
+    GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+    GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+    LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    
 
     /**/
     GPIO_InitStruct.Pin = LL_GPIO_PIN_11;
@@ -358,21 +356,19 @@ void StopMode_TurnOff_Some_GPIOs(void)
 
 	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_ALL);
 
-    //CCS811 wakeup脚，PA7,swd 烧录调试脚;
- //   GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_7|LL_GPIO_PIN_13|LL_GPIO_PIN_14));
-    GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_13|LL_GPIO_PIN_14));   //ccs811开启后有6-7mA，这里关闭
+    GPIO_InitStruct.Pin = LL_GPIO_PIN_ALL;   //ccs811开启后有6-7mA，这里关闭
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO; 
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     //蓝牙芯片供电使能，PB13
-    GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_13));
+    GPIO_InitStruct.Pin = LL_GPIO_PIN_ALL;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     //二氧化碳传感器供电使能脚，PC4；模块供电维持，PC7；
-    GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_4|LL_GPIO_PIN_7));
+    GPIO_InitStruct.Pin = LL_GPIO_PIN_ALL;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
@@ -396,7 +392,7 @@ void Sys_Setting_Before_StopMode(void)
 
 	//LL_SYSTICK_DisableIT();
 	StopMode_TurnOff_Some_GPIOs();
-	Exit_GPIO_Interrupt_Init();
+//	Exit_GPIO_Interrupt_Init();
 
 }
 
@@ -429,7 +425,6 @@ void EXTI2_3_IRQHandler(void)
     if (LL_EXTI_IsActiveFallingFlag_0_31(LL_EXTI_LINE_3) != RESET)
     {
         LL_EXTI_ClearFallingFlag_0_31(LL_EXTI_LINE_3);
-        printf("GPIOD_3 has interrupt\r\n");
     }
 }
 

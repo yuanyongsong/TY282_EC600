@@ -173,7 +173,7 @@ void Usr_InitValue(void)
 	strncpy(UserIDBuf,Fs.UserID, sizeof(UserIDBuf)); 
 
 	//以下是需要获取到配置参数才能初始化的设备外设
-	RTC_Wake_Init(300);		//五分钟产生一次闹钟事件
+	RTC_Wake_Init(120);		//五分钟产生一次闹钟事件
 	if(G_Sensor_init())
 	{
 		printf("G sensor init ok\r\n");
