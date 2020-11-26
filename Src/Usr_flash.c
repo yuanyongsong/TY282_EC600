@@ -87,21 +87,24 @@ static void FS_FactroyValue(void)
 	memset(Fs.GprsPassWord, '\0', 16);
 	memset(Fs.LatitudeLast, '\0', 14);
 	memset(Fs.LongitudeLast, '\0', 14);
+	memset(Fs.UbloxIp, '\0', 21);
+	memset(Fs.UbloxPort, '\0', 7);
 
 	strcpy(Fs.IpPort, "7788");
 	strcpy(Fs.IpAdress, "bky.appxmg.com");
 	strcpy(Fs.ApnName, "mtc.gen");
 	strcpy(Fs.GprsUserName, "mtc");
 	strcpy(Fs.GprsPassWord, "mtc");
+	strcpy(Fs.UbloxIp,"www.gnss-aide.com");
+	strcpy(Fs.UbloxPort,"2621");
 
 	Fs.BKSavedCnt = 0;
 	Fs.BkSendCnt = 0;
 	Fs.BkSendLen = 0;
-	Fs.Interval = 120;
+	Fs.Interval = 1800;
 	Fs.HaveSetApn = 0;
 	Fs.Sensor = 0x10;
-	Fs.testcnt0 = 0x11;
-	Fs.testcnt1 = 0x11;
+
 	
 	Flag.HaveGetMccMnc = 0;
 }
@@ -161,11 +164,9 @@ void FS_InitValue(void)
 	}
 
 	printf("\r\n------Device parameters as follows:------\r\n\r\n");
-#if USR_FOR_JP
-	printf("Device suitable for Japan\r\n\r\n");
-#else
+
 	printf("Device suitable for China\r\n\r\n");
-#endif
+
 	printf("Device IMEI: 	 %s\r\n", Fs.DeviceImei);
 	printf("Fs.IpAdress: 	 %s\r\n", Fs.IpAdress);
 	printf("Fs.IpPort:       %s\r\n", Fs.IpPort);
@@ -190,10 +191,13 @@ void FS_UpdateValue(void)
 	Fs_len = sizeof(Fs);
 	if((Fs_len % 8) != 0)
 	{
-		Fs_len = Fs_len/8 + 1;
+		STMFLASH_WriteFs(FLASH_SAVE_ADDR, (u64 *)&Fs, Fs_len/8 + 1);
 	}
-
-	STMFLASH_WriteFs(FLASH_SAVE_ADDR, (u64 *)&Fs, Fs_len);
+	else
+	{
+		STMFLASH_WriteFs(FLASH_SAVE_ADDR, (u64 *)&Fs, Fs_len/8);
+	}
+	
 }
 
 //擦除用于保存断点扇区，一共8k，预计可以保存100个断点

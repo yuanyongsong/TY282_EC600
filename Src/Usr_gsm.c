@@ -5,11 +5,7 @@ unsigned char ResetMouldeCnt_1; //模块因为没有信号重启次数
 
 void Usr_ModuleGoSleep(void)
 {
-	#if NO_SLEEP
-	return;
-	#endif
-	
-	if (AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup ) //Flag.NeedAlarmCall在还有报警电话未拨打时不进入休眠
+	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup || Flag.NoSleepMode) 
 	{
 		return;
 	}
@@ -18,6 +14,7 @@ void Usr_ModuleGoSleep(void)
 	Flag.Insleeping = 1;
 	Flag.ModuleSleep = 1;
 	Flag.NeedModuleOff = 1;
+	Flag.IsGpsOn = 0;
 	GREEN_OFF;
 	RED_OFF;
 	Usr_ModuleTurnOff();
@@ -28,25 +25,30 @@ void Usr_ModuleGoSleep(void)
 	G_Sensor_Pwr(0);
 	Sys_Setting_Before_StopMode();
 sleep:
+	#if 1
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
 	LL_LPM_EnableDeepSleep();
 	__WFI();
 
-	if(Flag.IrNoNeedWakeUp)
+	#else
+	LL_TIM_DeInit(TIM3);
+	while(Flag.RtcInterrupt == 0)
+	{
+		delay_ms(100);
+		WatchDogCnt = 0;
+	}
+	Flag.RtcInterrupt = 0;
+	#endif
+
+	//在周期唤醒上传定位数据和5分钟唤醒一次上传心跳包时唤醒系统
+	if((WakeupCnt % (Fs.Interval/60) != 0)&&(WakeupCnt % 5 != 0))		
 	{
 		goto sleep;
 	}
-#if 1
+
 	Usr_InitHardware();
 	G_Sensor_Pwr(1);
-#else
-    SystemClock_Config();
-	StopMode_TurnOn_Some_GPIOs();
-	UART_Init();
-	TIMER_Init();
-	IIC_Init();
-//	EXFLASH_SpiInit();
-#endif
+
 }
 
 void Usr_ModuleWakeUp(void)
@@ -59,10 +61,23 @@ void Usr_ModuleWakeUp(void)
 //	Flag.BatChk = 1;
 	Flag.HaveSynRtc = 0;
 	Flag.NtpGetCCLK = 1;
-
-	GprsSend.posCnt = 1;
-	GprsSend.posFlag = 1;
 	Flag.NeedModuleOn = 1;
+	Flag.NeedUpdateFs = 1;
+
+	if(WakeupCnt % (Fs.Interval/60) == 0)
+	{
+		GprsSend.posCnt = 1;
+		GprsSend.posFlag = 1;
+		NoGpsRestartCnt = 0;			//唤醒的时候需要清0未搜索到gps计数
+		Flag.NeedGpsOpen = 1;
+		printf("\r\n Need send Location data\r\n");
+	}
+	else if(WakeupCnt % 5 == 0)
+	{
+		GprsSend.handFlag = 1;
+		Flag.NeedGpsOpen = 0;
+		printf("\r\n Need send Hand data\r\n");
+	}
 
 	LL_mDelay(200);
 
@@ -145,8 +160,15 @@ void Usr_ModuleTurnOff(void)
 	AtType = AT_NULL;
 
 	GREEN_ON;
+	
 	while (Flag.HavePwdMode)
 	{
+		if (strstr(Uart1Buf, "NORMAL POWER DOWN") && !Flag.ModePwrDownNormal)
+		{
+			Flag.ModePwrDownNormal = 1;
+			printf("\r\nNORMAL POWER DOWN!\r\n");
+		}
+
 		if ((ModePwrDownCnt <= 0) || Flag.ModePwrDownNormal)
 		{
 			POWER_OFF;
@@ -155,6 +177,7 @@ void Usr_ModuleTurnOff(void)
 			Flag.HavePwdMode = 0;
 			printf("\r\nModule turn off!\r\n");
 		}
+
 		LL_mDelay(100);
 	}
 	UART_AtInit();	//有的时候关机前AT串口接收到了数据没有处理，重启开机后，这个数据会干扰程序判断

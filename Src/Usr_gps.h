@@ -50,7 +50,8 @@ extern float		 CurElevation;
 extern unsigned short NoGpsRestartCnt;  
 extern char  LBS_Piont[];
 extern unsigned char LBS_Num;
-
+extern unsigned char WaitUbloxCnt;
+extern unsigned char CantConectAgpsCnt;
 
 void GPS_Init(void);
 void GPS_DataProcess(char * pSrc);

@@ -3,11 +3,12 @@
 
 #include "usr_main.h"
 
-#define ACTIVE_TIME 60
+#define ACTIVE_TIME 180
 
 extern unsigned char baseTimeSec;
 extern unsigned int  baseSecCnt;
 extern unsigned int  AtDelayCnt; 
+extern unsigned short WakeupCnt;
 
 #ifndef USR_RTC
 #define USR_RTC
@@ -23,7 +24,8 @@ typedef struct {
 #endif
 
 extern Rtc_st Rtc;
-extern unsigned short IntervalTemp;
+extern Rtc_st RtcAgpsBackup;
+extern unsigned int IntervalTemp;
 extern unsigned char ResetLeftCnt;
 extern unsigned int  Timestamp;	
 extern unsigned int  baseSecCnt;
@@ -39,6 +41,7 @@ uint32_t covBeijing2UnixTimeStp(Rtc_st *beijingTime,u8 TIMEZONE);
 void RTC_Wake_Init(u16 sec);
 void delay_us(unsigned int us);
 void delay_ms(unsigned int ms);
+u8 CompareAgpsRct(Rtc_st RtcNow, Rtc_st RtcBackUp);
 #endif
 
 

@@ -215,11 +215,15 @@ typedef struct FLAG_
 	unsigned char GpsGprmcOk:1;					//获取到GPRM数据
 	unsigned char GpsGpggaOk:1;					//获取到GPGG数据
 	unsigned char NeedGpsOpen:1;      			//需要开gps
-	unsigned char HaveSendAgps:1;       		//已经完成发送AGPS数据
 	unsigned char LatFlag:1;          			//0:N北纬 1:S南纬
 	unsigned char LonFlag:1;          			//0:E东经 1:W西经	
-	unsigned char FristGetGps:1;      //首次获取到gps，用于获取系统时间
+	unsigned char FristGetGps:1;      			//首次获取到gps，用于获取系统时间
 
+	unsigned char AskUbloxData:1;	  			//请求ublox assistonnowline
+	unsigned char ConUblox:1;         			//TCP连接到ublox服务器
+	unsigned char NeedCloseAgpsConnect:1;   	//需要关闭AGPS网络
+	unsigned char NoSleepMode:1;				//当设定的上传时间间隔小于一定值时，设备不休眠
+	unsigned char RtcInterrupt:1;				//有RTC中断触发标志，用来模拟设备进入stop模式
 }FLAG;
 #endif
 

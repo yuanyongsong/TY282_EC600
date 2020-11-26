@@ -107,9 +107,7 @@ void Usr_InitValue(void)
 	Flag.NeedSetNtp = 1;
 	Flag.NeedGetIMEI = 1;
 	Flag.NeedcheckCCID = 1;
-	#if USE_SOFTSIM
-	Flag.NeedChangeSoftSim = 1;
-	#endif
+	Flag.NeedReloadAgps = 1;
 	AT_CBC_IntervalTemp = 20;
 	ActiveTimer = ACTIVE_TIME;
 	
@@ -145,9 +143,9 @@ void Usr_InitValue(void)
 		Fs.Sensor = 0x4;
 	}
 
-	if (Fs.Interval == 0 || Fs.Interval == 0xffff)
+	if (Fs.Interval == 0 || Fs.Interval == 0xffffffff)
 	{
-		Fs.Interval = 120;
+		Fs.Interval = 3600;
 		Flag.NeedUpdateFs = 1;
 	}
 	
@@ -173,7 +171,15 @@ void Usr_InitValue(void)
 	strncpy(UserIDBuf,Fs.UserID, sizeof(UserIDBuf)); 
 
 	//以下是需要获取到配置参数才能初始化的设备外设
-	RTC_Wake_Init(120);		//五分钟产生一次闹钟事件
+	if(Fs.Interval <=120)
+	{
+		Flag.NoSleepMode = 1;			//小于2分钟时，低功耗模式已经没有优势，不进入休眠
+	}
+	else
+	{
+		RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
+	}
+	
 	if(G_Sensor_init())
 	{
 		printf("G sensor init ok\r\n");

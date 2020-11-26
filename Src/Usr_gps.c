@@ -41,6 +41,9 @@ char Gps_S_back_up = 'N';
 char Gps_W_back_up = 'E';
 char Gps_W_S_Cnt;
 
+unsigned char WaitUbloxCnt;
+unsigned char CantConectAgpsCnt;
+
 char LBS_Piont[68]; //最多容纳7个基站数据
 unsigned char LBS_Num = 0;
 
@@ -171,7 +174,6 @@ void GPS_Handle(void)
 		OpenGpsCnt = 5;
 		Flag.NeedResetGps = 0;
 		Flag.GpsReseting = 1;
-		Flag.HaveSendAgps = 0;
 
 //		UART_DeInitUartGps();
 		return;
@@ -182,7 +184,7 @@ void GPS_Handle(void)
 		{
 			GPS_ON;
 
-			if (Flag.GpsReseting)
+			if (Flag.GpsReseting)	
 			{
 				Flag.NeedReloadAgps = 1;
 				Flag.GpsReseting = 0;
@@ -194,7 +196,7 @@ void GPS_Handle(void)
 			return;
 		}
 	}
-	else if (ActiveTimer )
+	else if (ActiveTimer)
 	{
 		if (!Flag.IsGpsOn && !OpenGpsCnt && !Flag.Insleeping)
 		{
@@ -1371,14 +1373,12 @@ void GPS_DataProcess(char *pSrc)
 					{
 						MoveData.MoveFisrt = 0;
 
-#if TEST_USE
+#if SPEED_GPS
 						IntervalTemp = 10; //有速度后上传时间间隔为10,测试用
-#endif
-
-						ActiveTimer = ACTIVE_TIME; //有速度的情况下，不要让设备进入休眠
-												   //			if(!(Fs.ModeSet&MODE3))
 						GprsSend.posCnt = 3;
-
+						ActiveTimer = ACTIVE_TIME; //有速度的情况下，不要让设备进入休眠
+#endif
+										   
 						//角度变化判断	20140728_2
 						//速度首次大于2km/h,保存当前角度值
 						if (!Flag.SetDegreeData)
@@ -1402,7 +1402,7 @@ void GPS_DataProcess(char *pSrc)
 					{
 						Flag.SetDegreeData = 0;
 
-#if TEST_USE
+#if SPEED_GPS
 						IntervalTemp = Fs.Interval;
 #endif
 
@@ -1434,7 +1434,7 @@ void GPS_DataProcess(char *pSrc)
 				printf("\r\nThe locton data is jumper piont,abord!\r\n");
 				if (speedByte > 60) //有较大速度的时候，需要计算丢失定位时车辆还在移动导致位置偏移
 					NoGpsTime++;
-				if (++unValidCnt > 30)
+				if (++unValidCnt > 15)
 				{
 					unValidCnt = 0;
 					SchkLat = 0;

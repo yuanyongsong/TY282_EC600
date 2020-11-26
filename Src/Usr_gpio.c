@@ -356,7 +356,8 @@ void StopMode_TurnOff_Some_GPIOs(void)
 
 	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_ALL);
 
-    GPIO_InitStruct.Pin = LL_GPIO_PIN_ALL;   //ccs811开启后有6-7mA，这里关闭
+    //不关闭PA13和PA14
+    GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_13|LL_GPIO_PIN_14));   //ccs811开启后有6-7mA，这里关闭
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO; 
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -434,14 +435,6 @@ void EXTI4_15_IRQHandler(void)
     if (LL_EXTI_IsActiveRisingFlag_0_31(LL_EXTI_LINE_13) != RESET)
     {
         LL_EXTI_ClearRisingFlag_0_31(LL_EXTI_LINE_13);
-        printf("RI has interrupt\r\n");
-		if (Flag.ModuleSleep)
-        {
-            Flag.ModuleSleep = 0;
-            Flag.ModuleWakeup = 1;
-			Flag.IrNoNeedWakeUp = 0;
-            ActiveTimer = 100;
-        } 
     }
 
     if (LL_EXTI_IsActiveRisingFlag_0_31(LL_EXTI_LINE_15) != RESET)

@@ -21,6 +21,8 @@ typedef struct{
 	char   AppIpPort[6];       			//远程升级用FTP端口号
 	char   IpAdress[50];				//服务器IP或者域名
 	char   AppIpAdress[50];   		 	//远程升级用http的IP或地址
+	char   UbloxIp[21];					//请求ublox星历时的IP
+	char   UbloxPort[7];				//请求ublox星历时的端口
 	char   ApnName[32];
 	char   GprsUserName[32];    		//gprs用户名
 	char   GprsPassWord[16];    		//gprs密码
@@ -36,9 +38,7 @@ typedef struct{
 	unsigned int    BkSavedLen;         //已存断点字长计数，单位byte
 	unsigned short  BkSendCnt;          //已发断点计数
 	unsigned int  	BkSendLen;          //已发断点字长计数，单位byte
-	unsigned short  Interval;           //定位包上传间隔	
-	unsigned short  testcnt0;           //定位包上传间隔	
-	unsigned short  testcnt1;           //定位包上传间隔	
+	unsigned int  	Interval;           //定位包上传间隔,单位是秒	
 }FS;
 #endif
 

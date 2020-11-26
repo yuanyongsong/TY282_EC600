@@ -3,7 +3,7 @@
 
 #include "usr_main.h"
 
-#define UART1_BUF_LEN 1500       
+#define UART1_BUF_LEN 3000       
 #define UART2_BUF_LEN 640 
 #define UART3_BUF_LEN 100
 #define UART4_BUF_LEN 100

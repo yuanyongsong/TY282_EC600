@@ -1,6 +1,6 @@
 #include "usr_main.h"
 
-#define USR_TEST_PLAM		0		//使用测试服
+#define USR_TEST_PLAM		1		//使用测试服
 
 AT_TYPE AtType; 					//给AtType赋值的函数要在没有AT指令通信时调用，
 									//赋值语句后要有break或return,以免影响同函数其它对AtType的赋值
@@ -145,7 +145,7 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		break;
 
 	case AT_QNTP:
-		strcpy(pDst, "AT+QNTP=3,\"ntp1.aliyun.com\",123\r\n");
+		strcpy(pDst, "AT+QNTP=3,\"210.72.145.44\",123\r\n");
 		TIMER_AtDelay(3);
 		break;
 
@@ -155,16 +155,31 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		break;
 
 	case AT_QIOPEN:
-		sprintf(pDst, "AT+QIOPEN=1,1,\"TCP\",\"%s\",%s,0,1\r\n", Fs.IpAdress, Fs.IpPort);
-		Flag.ConNet = 1;
+		if (Flag.AskUbloxData)
+		{
+			sprintf(pDst, "AT+QIOPEN=1,0,\"TCP\",\"%s\",%s,0,1\r\n", Fs.UbloxIp, Fs.UbloxPort);
+			Flag.ConUblox = 1;
+		}
+		else
+		{
+			sprintf(pDst, "AT+QIOPEN=1,1,\"TCP\",\"%s\",%s,0,1\r\n", Fs.IpAdress, Fs.IpPort);
+			Flag.ConNet = 1;
+		}
+		
 		TIMER_AtDelay(2);
 		break;
 
 	case AT_QISEND:
-		if (GprsType != BKDATA)
+		if(Flag.AskUbloxData)
 		{
-				GprsDataLen = WIRELESS_GprsSendPacket(GprsType);
-				sprintf(pDst, "AT+QISEND=1,%d\r\n", GprsDataLen);	
+			GprsType = AGPSDATA;
+			GprsDataLen = WIRELESS_GprsSendPacket(GprsType);
+			sprintf(pDst, "AT+QISEND=0,%d\r\n", GprsDataLen);	
+		}
+		else if (GprsType != BKDATA)
+		{
+			GprsDataLen = WIRELESS_GprsSendPacket(GprsType);
+			sprintf(pDst, "AT+QISEND=1,%d\r\n", GprsDataLen);	
 		}
 		else
 		{
@@ -180,6 +195,11 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 
 	case AT_QIDEACT:
 		strcpy(pDst, "AT+QIDEACT=1\r\n");
+		TIMER_AtDelay(2);
+		break;
+
+	case AT_QICLOSE_AGPS:
+		strcpy(pDst, "AT+QICLOSE=0\r\n");
 		TIMER_AtDelay(2);
 		break;
 
@@ -596,10 +616,10 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 
 			if (!Flag.Insleeping)
 			{
-//				if (CompareAgpsRct(Rtc, RtcAgpsBackup))
-//				{
-//					Flag.NeedReloadAgps = 1;
-//				}
+				if (CompareAgpsRct(Rtc, RtcAgpsBackup))
+				{
+					Flag.NeedReloadAgps = 1;
+				}
 			}
 			AtDelayCnt = 0;
 			*temType = AT_NULL;
@@ -647,6 +667,12 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			ConnectDelayCnt = 15;
 			*temType = AT_NULL;
 			error3++;
+
+			if (Flag.AskUbloxData)
+			{
+				Flag.AskUbloxData = 0;
+			}
+
 			if (error3 > 5)
 			{
 				error3 = 0;
@@ -711,6 +737,12 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 				NeedModuleReset = CONNECT_SERVICE_FAILED;
 			}
 
+			if (Flag.AskUbloxData && Flag.ConUblox)
+			{
+				Flag.AskUbloxData = 0;
+				Flag.NeedCloseAgpsConnect = 1;
+			}
+
 			back = 1;
 			*temType = AT_NULL;
 		}
@@ -726,6 +758,12 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 	case AT_GPRSEND:
 		if ((p1 = strstr(pSrc, "OK")) != NULL)
 		{
+			if (Flag.AskUbloxData && Flag.ConUblox) 
+			{
+				Flag.AskUbloxData = 0;
+				WaitUbloxCnt = 10;		//发送成功后，等待10秒，如果超时未收到，断开AGPS链接
+			}
+
 			//如果是休眠期间周期性唤醒时上传数据成功，ActiveTimer = 2即刻进入休眠
 			if((Flag.Insleeping) || (GprsSend.posCnt == 0))
 			{
@@ -745,6 +783,12 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 				GprsDataLen = WIRELESS_GprsSendPacket(GprsType);
 	//			EXFLSAH_SaveBreakPoint();
 			}
+
+			if (Flag.AskUbloxData)
+			{
+				Flag.AskUbloxData = 0;
+			}
+
 			error2++;
 			if (error2 > 5)
 			{
@@ -769,7 +813,30 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 		back = 1;
 		break;
 	}
-	
+
+	case AT_QICLOSE_AGPS:
+		if (strstr(pSrc, "OK"))
+		{
+			Flag.ConUblox = 0;
+			AtDelayCnt = 0;
+			back = 1;
+		}
+		else
+		{
+			AtDelayCnt = 0;
+			back = 1;
+		}
+
+		if (!Flag.GprsConnectOk)	//如果是开机时，先获取AGPS数据，获取完成之后就开始连接服务器
+		{
+			*temType = AT_QIOPEN;
+		}
+		else
+		{
+			*temType = AT_NULL;
+		}
+		break;	
+
 	case AT_QIDEACT:
 	{
 		Flag.GprsConnectOk = 0;
@@ -1202,6 +1269,24 @@ void Flag_check(void)
 	{
 		AtError.GprsConnectEorCnt = 0;
 		NeedModuleReset = CONNECT_SERVICE_FAILED;
+		return;
+	}
+
+	if ((Flag.NeedReloadAgps && Flag.ConNet)&&(Fs.LongitudeLast[0] != 0xFF)&&(Fs.LongitudeLast[0] != 0))
+	{
+		Flag.NeedReloadAgps = 0;
+		Flag.AskUbloxData = 1;
+		if (!Flag.IsContextAct)
+			AtType = AT_QICSGP;
+		else
+			AtType = AT_QIOPEN;
+		return;
+	}
+
+	if (Flag.NeedCloseAgpsConnect)
+	{
+		Flag.NeedCloseAgpsConnect = 0;
+		AtType = AT_QICLOSE_AGPS;
 		return;
 	}
 }

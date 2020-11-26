@@ -59,6 +59,35 @@ void UART_Send(USART_TypeDef *USARTx, uint8_t *data,uint16_t dataleng)
     }
 }
 
+void UART_SendUblox(void)
+{
+
+	u16 AgpsDatalen = 0;
+	char *pSrc = NULL;
+	char *p1 = NULL;
+
+	pSrc = Uart1Buf;
+	while ((pSrc = strstr(pSrc, "DataLength: ")) != NULL)
+	{
+		pSrc += 12;
+		p1 = strstr(pSrc, ".\n");
+		if ((p1 - pSrc) > 4)
+			break;
+		AgpsDatalen = Ascii2BCD_u16(pSrc, p1 - pSrc);
+		p1 += 2;
+		p1 = strstr(p1, ".\n");
+		p1 += 2;
+		UART_Send(USART2, (u8 *)p1, AgpsDatalen);
+		pSrc = p1 + AgpsDatalen;
+	}
+
+	memset(&RtcAgpsBackup, 0, sizeof(RtcAgpsBackup));
+	memcpy(&RtcAgpsBackup, &Rtc, sizeof(Rtc));
+
+	printf("\r\nAgps new data is %d.%d.%d.%d\r\n", RtcAgpsBackup.year, RtcAgpsBackup.mon, RtcAgpsBackup.day, RtcAgpsBackup.hour);
+
+	WaitUbloxCnt = 0;
+}
 
 void UART_AtInit(void)
 {
@@ -174,6 +203,18 @@ void At_Receive(void)
 		Flag.GprsConnectOk = 0;
 	}
 
+	//有来自AGPS服务器信息
+	if (strstr(Uart1Buf, "\"recv\",0")) 
+	{
+		UART_SendUblox();
+		Flag.NeedCloseAgpsConnect = 1;
+	}
+
+	//有来自平台信息
+	if (strstr(Uart1Buf, "\"recv\",1")) 
+	{
+//		WIRELESS_GprsReceive(AtBuf, AtIndex);
+	}
 }
 
 void Gps_Data_Receive(void)
@@ -502,6 +543,7 @@ void USART1_IRQHandler(void)
 		{
 			Uart1Buf[Uart1Index++]=tmp;   
 		}
+
 	}
 }
 

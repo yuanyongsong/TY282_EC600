@@ -1,16 +1,18 @@
 #include "usr_main.h"
 
 Rtc_st Rtc;
+Rtc_st RtcAgpsBackup; //AGPS获取时间备份
 
 unsigned char baseTimeCnt;
 unsigned char baseTimeSec;
 unsigned char baseTimeMin;
 unsigned char baseTimeHor;
 unsigned int baseSecCnt;
-unsigned int Timestamp;		//unix时间（时间戳）
-unsigned char ResetLeftCnt; //该变量为重启设备倒计时。被赋值之后递减，为0时重启模块。需要延时重启时使用，例如更新Fs数据后需要重启
-unsigned int AtDelayCnt; 	//AT指令发送成功后延时多久发送下一条指令，通常AT指令处理处理完成后会清零该位，取消等待
-unsigned short IntervalTemp; //用来暂存定时上传时间间隔
+unsigned int Timestamp;		 //unix时间（时间戳）
+unsigned char ResetLeftCnt;  //该变量为重启设备倒计时。被赋值之后递减，为0时重启模块。需要延时重启时使用，例如更新Fs数据后需要重启
+unsigned int AtDelayCnt; 	 //AT指令发送成功后延时多久发送下一条指令，通常AT指令处理处理完成后会清零该位，取消等待
+unsigned int IntervalTemp;   //用来暂存定时上传时间间隔
+unsigned short WakeupCnt;	 //RTC中断次数，用于唤醒系统
 
 unsigned char AT_CBC_IntervalTemp; 	//电池电量采样间隔
 
@@ -111,6 +113,53 @@ void TIMER_Init(void)
 	Usr_TIM3_Init(); 
 }
 
+void TIMER_RtcInit(void)
+{
+	/*********RTC设置***********/
+	Rtc.year = 17;
+	Rtc.mon = 0;
+	Rtc.day = 0;
+	Rtc.hour = 0;
+	Rtc.min = 0;
+	Rtc.sec = 0;
+
+	memset(&RtcAgpsBackup, 0, sizeof(RtcAgpsBackup));
+}
+
+//比较保存的AGPS数据时间和当前时间，超过6小时，认为数据无效，返回1
+u8 CompareAgpsRct(Rtc_st RtcNow, Rtc_st RtcBackUp)
+{
+	unsigned char hour = 0;
+	u8 result = 1;
+
+	printf("\r\nAgps old data is %d.%d.%d.%d\r\n", RtcBackUp.year, RtcBackUp.mon, RtcBackUp.day, RtcBackUp.hour);
+
+	if (RtcNow.year > RtcBackUp.year)
+		return result;
+	else if (RtcNow.mon > RtcBackUp.mon)
+		return result;
+	else if (RtcNow.day - RtcBackUp.day > 1)
+		return result;
+	else if (RtcNow.day - RtcBackUp.day == 1)
+	{
+		hour = RtcNow.hour + 24 - RtcBackUp.hour;
+		if (hour >= 6)
+			return result;
+		else
+			result = 0;
+	}
+	else if (RtcNow.day == RtcBackUp.day)
+	{
+		hour = RtcNow.hour - RtcBackUp.hour;
+		if (hour >= 6)
+			return result;
+		else
+			result = 0;
+	}
+	else
+		result = 0;
+	return result;
+}
 
 //各种以秒为单位进行变量的加减
 void TIMER_SecCntHandle(void)
@@ -261,7 +310,36 @@ void TIMER_SecCntHandle(void)
 	{
 		ModePwrDownCnt--;
 	}
+	
+	if (WaitUbloxCnt > 0) 
+	{
+		WaitUbloxCnt--;
+		if (0 == WaitUbloxCnt)
+		{
+			Flag.NeedCloseAgpsConnect = 1;
+		}
+	}
+	if (!Flag.HaveGPS)
+	{
+		if (NoGpsRestartCnt < 180)
+			NoGpsRestartCnt++;
+		else
+		{
+			Flag.NeedResetGps = 1;
+			NoGpsRestartCnt = 0;
+			printf("\r\n3 min have no gps and restart gps\r\n"); //调试完成后删掉
+		}
+	}
+	else if (Flag.HaveGPS)
+    {
+        NoGpsRestartCnt = 0;
+    }
 
+	if (OpenGpsCnt > 0)
+	{
+		OpenGpsCnt--;
+	}
+		
 	if (GprsSend.posTimer < IntervalTemp)
 	{
 		GprsSend.posTimer++;
@@ -553,14 +631,22 @@ void RTC_TAMP_IRQHandler(void)
 	{
 		LL_RTC_ClearFlag_WUT(RTC);
 		LL_EXTI_ClearRisingFlag_0_31(LL_EXTI_LINE_19); 
-		printf("\r\n----------come to rtc interrupt----------\r\n");
+//		printf("\r\n----------come to rtc interrupt----------\r\n");
+
+		WakeupCnt ++;
+		Timestamp += 60;
+
 		if (Flag.ModuleSleep)
+		{
+			Flag.RtcInterrupt = 1;
+		}		
+
+		if ((Flag.ModuleSleep)&&((WakeupCnt % (Fs.Interval/60) == 0)||(WakeupCnt % 5 == 0)))
         {
             Flag.ModuleSleep = 0;
             Flag.ModuleWakeup = 1;
 			Flag.IrNoNeedWakeUp = 0;
             ActiveTimer = 100;
-			Timestamp += 300;
         } 
 	}
 }

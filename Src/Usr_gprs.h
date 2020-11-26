@@ -13,7 +13,8 @@
 
 typedef enum{
 	GPRS_NULL,
-	LOGIN,DATA,BKDATA,UPGRESULT
+	LOGIN,DATA,BKDATA,UPGRESULT,AGPSDATA,
+	HAND
 }GPRS_TYPE;
 	
 #endif
@@ -24,30 +25,22 @@ typedef enum{
 #define TFTPLEN    		30
 #define GPRSCONTLEN		200
 
-#define USR_FOR_JP		0				//切换在中国使用和日本使用开关，0为中国使用，1为日本使用
-#define SENSOR_3		1
-#define NO_SLEEP		0
-#define TEST_USE		1
+#define SPEED_GPS		0
 
-#if USR_FOR_JP
-	#define IMEI_MANUAL	    ""
-	#define JP_AT_USE		1
-	#define USE_SOFTSIM		0
-#else
-	#define IMEI_MANUAL	"861118010103569"
-	//#define IMEI_MANUAL	"352656103473735"
-	//#define IMEI_MANUAL	"999999999999999"
-	//#define IMEI_MANUAL	""
-	#define USE_SOFTSIM		0
 
-#endif
+#define IMEI_MANUAL	"861118010103569"
+//#define IMEI_MANUAL	"352656103473735"
+//#define IMEI_MANUAL	""
+
 
 #ifndef _GPRS_SEND
 #define _GPRS_SEND
 typedef struct{
-	unsigned char posCnt;     //定位包发送计数	
-	unsigned short posTimer;  //定位包上传间隔倒计时
-	unsigned char posFlag;
+	unsigned char posCnt;     	//定位包发送计数	
+	unsigned short posTimer;  	//定位包上传间隔倒计时
+	unsigned char posFlag;	  	//需要发送定位包发送标志
+	unsigned char handFlag;		//需要发送心跳包标志
+	unsigned short handsendcnt;	//已发送的心跳包数量
 }GPRS_SEND;
 #endif
 

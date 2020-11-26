@@ -349,27 +349,32 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 
 	switch (switch_tmp)
 	{
-	case LOGIN:
-
+	case AGPSDATA:
+		sprintf(GprsSendBuf, "user=qyjem@qq.com;pwd=qgjqgj88;cmd=full;lat=%s;lon=%s;pacc=1000;",latTmp,lonTmp);
 		break;
 
 	case DATA:
 		sprintf(GprsContent, "LOCA:G;CELL:1,1cc,2,2795,1435,64;GDATA:%c,%d,%d%d%d%d%d%d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:89,98;WAY:0",
 				gpsValid,CurSateCnt,Rtc.year,Rtc.mon,Rtc.day, 
 				Rtc.hour,Rtc.min,Rtc.sec,latTmp,lonTmp,speedByte,Degrees,Elevation);
-
 		break;
 
 	case UPGRESULT:
 
 		break;
 
+	case HAND:
+		sprintf(GprsContent, "#SYNC:%04X;STATUS:0001",GprsSend.handsendcnt);
+		break;
+
 	default:
 		break;
 	}
-	content_len = strlen(GprsContent);
-
-	sprintf(GprsSendBuf, "S168#%s#%04X#%04X#%s$",IMEI,PacketSerialNum,content_len,GprsContent);
+	if(switch_tmp != AGPSDATA)
+	{
+		content_len = strlen(GprsContent);
+		sprintf(GprsSendBuf, "S168#%s#%04X#%04X#%s$",IMEI,PacketSerialNum,content_len,GprsContent);
+	}
 
 	data_len = strlen(GprsSendBuf);
 	return data_len;
@@ -377,12 +382,6 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 
 void GPRS_Send_Handle(void)
 {
-	//如果是没有发送登入包需要发送登入包时，需要时间和CCID都已经获取到。
-	//登入包发送之后，就不需要这个两个条件
-	if ((!Flag.HaveGetCCID || !Flag.HaveSynRtc) && (Flag.NeedLogIn))
-	{
-		return;
-	}
 
 	if (Flag.NeedLogIn)
 	{
@@ -393,7 +392,6 @@ void GPRS_Send_Handle(void)
 		return;
 	}
 
-	GprsSend.posCnt = 1;
 	
 	if ((GprsSend.posCnt > 0) && (GprsSend.posFlag) && (Flag.HaveGPS))
 	{
@@ -402,6 +400,15 @@ void GPRS_Send_Handle(void)
 		GprsSend.posCnt = 0;
 		GprsSend.posFlag = 0;
 		return;
+	}
+
+	if(GprsSend.handFlag)
+	{
+		AtType = AT_QISEND;
+		GprsType = HAND;
+		GprsSend.handFlag = 0;
+		GprsSend.handsendcnt ++;
+		return;		
 	}
 /*
 	if (EXFLASH_ReadBreakPoint())
@@ -421,10 +428,11 @@ void GPRS_Send_Handle(void)
 	}
 }
 
+#
 //定位包保存
 void GPRS_SaveBreakPoint(void)
 {
-
+#if 0
 	if ((Flag.GprsConnectOk == 0 || Flag.PsSignalOk == 0) && Flag.ReadySaveBreak && GprsSend.posCnt > 0)
 	{
 		Flag.ReadySaveBreak = 0;
@@ -437,6 +445,7 @@ void GPRS_SaveBreakPoint(void)
 		WIRELESS_GprsSendPacket(GprsType);
 //		EXFLSAH_SaveBreakPoint();
 	}
+#endif
 }
 
 //例:将"41424344" 转换为"ABCD"
@@ -597,6 +606,22 @@ void WIRELESS_Handle(void)
 			AtType = AT_NULL;
 			Flag.WaitAtAck = 0;
 			AtDelayCnt = 0;
+		}
+
+		//获取星历过程中联网异常，及时关闭 20140812_1
+		if ((ResetCnt > 35) && Flag.AskUbloxData)
+		{
+			Flag.WaitAtAck = 0;
+			AtDelayCnt = 0;
+			ResetCnt = 0;
+			CantConectAgpsCnt++;
+
+			if (CantConectAgpsCnt < 3)			//三次失败后不再连AGPS服务器
+				Flag.NeedReloadAgps = 1;
+			else
+				printf("\r\nConnect AGPS Service Fail!\r\n");
+			Flag.AskUbloxData = 0;
+			AtType = AT_QICLOSE_AGPS;
 		}
 	}
 	else
