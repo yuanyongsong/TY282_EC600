@@ -1,16 +1,8 @@
+#ifndef __USR_ADC_H
+#define __USR_ADC_H
 
+void Adc_init(void);
+u16 Adc_Value_Get(void);
 
-#define ADC_CHANNEL_CONF_RDY_TIMEOUT_MS  (   1U)
-#define ADC_CALIBRATION_TIMEOUT_MS       (   1U)
-#define ADC_ENABLE_TIMEOUT_MS            (   1U)
-#define ADC_DISABLE_TIMEOUT_MS           (   1U)
-#define ADC_STOP_CONVERSION_TIMEOUT_MS   (   1U)
-#define ADC_CONVERSION_TIMEOUT_MS        (4000U)
-
-#define VDDA_APPLI                       (3300U)
-#define VAR_CONVERTED_DATA_INIT_VALUE    (__LL_ADC_DIGITAL_SCALE(LL_ADC_RESOLUTION_12B) + 1)
-
-#define ADC_DELAY_CALIB_ENABLE_CPU_CYCLES  (LL_ADC_DELAY_CALIB_ENABLE_ADC_CYCLES * 32)
-
-#define ADC_UNITARY_CONVERSION_TIMEOUT_MS (   1U)
-
+extern u32	BatVoltage_Adc;
+#endif

@@ -113,6 +113,10 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		strcpy(pDst, "AT+CREG?\r\n");
 		break;
 
+	case AT_CGREG_SET:
+		strcpy(pDst, "AT+CGREG=2\r\n");
+		break;
+
 	case AT_CGREG:
 		strcpy(pDst, "AT+CGREG?\r\n");
 		break;
@@ -316,9 +320,9 @@ unsigned char AT_InitReceive(AT_TYPE *temType, char *pSrc)
 		}
 		else if (*temType == AT_CNMI)
 		{
-			*temType = AT_CLVL;
+			*temType = AT_CGREG_SET;
 		}
-		else if (*temType == AT_CLVL)
+		else if (*temType == AT_CGREG_SET)
 		{
 			*temType = AT_CGSN;
 		}
@@ -442,7 +446,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 	case AT_CGREG:
 		if (strstr(pSrc, "+CGREG:"))
 		{
-			if (strstr(pSrc, ",1") || strstr(pSrc, ",5"))
+			if (strstr(pSrc, "2,1") || strstr(pSrc, "2,5"))
 			{
 
 				if (Flag.PsSignalChk && Flag.GprsConnectOk && (ConnectDelayCnt > 0))
@@ -452,6 +456,28 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 				else
 				{
 					*temType = AT_QISTATE;
+				}
+
+				//获取基站LAC
+				p1 = strstr(pSrc, "\"");
+				p1 ++;
+				ptem = strstr(p1, "\"");
+				if((ptem - p1) == 4)
+				{
+					memset(Lac,0,sizeof(Lac));
+					strncpy(Lac,p1,ptem - p1);
+				}
+
+				p1 = ptem + 1;
+
+				//获取基站CID
+				p1 = strstr(p1, "\"");
+				p1 ++;
+				ptem = strstr(p1, "\"");
+				if((ptem - p1) <= 8)
+				{
+					memset(Cid,0,sizeof(Cid));
+					strncpy(Cid,p1,ptem - p1);
 				}
 
 				Flag.PsSignalOk = 1; 

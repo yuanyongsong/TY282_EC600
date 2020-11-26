@@ -84,6 +84,7 @@ void Usr_InitHardware(void)
 	UART_Init();
 	TIMER_Init();
 	IIC_Init();
+	Adc_init();
 }
 
 
@@ -194,6 +195,14 @@ void Flag_Check(void)
 		Flag.UpgrateFailed = 1;
 		Flag.NeedSendUpgResult = 1;
 		UpgInfo_InitValue();
+	}
+
+	if(Flag.NeedGetBatVoltage)
+	{
+		Flag.NeedGetBatVoltage = 0;
+		BatVoltage_Adc = (u32)Adc_Value_Get();
+		BatVoltage_Adc = (u16)(BatVoltage_Adc * 478/100);		//转换成电池电压,1M和270k分压，采样值*（1.27/0.27）=采样值*4.7,修正到4.78
+		printf("\r\nThe battery voltage is %d mv\r\n",BatVoltage_Adc);
 	}
 }
 

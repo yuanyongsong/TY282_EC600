@@ -277,11 +277,11 @@ void TIMER_SecCntHandle(void)
 		AT_CBC_IntervalTemp = 20;
 	}
 
-	if (baseSecCnt % AT_CBC_IntervalTemp == 2) 
+	if (baseSecCnt % 10 == 2) 
 	{
-//		Flag.BatChk = 1; 		
+		Flag.NeedGetBatVoltage = 1; 			
 	}
-
+			
 	//查电量
 	if (baseSecCnt % 300 == 6) 
 	{

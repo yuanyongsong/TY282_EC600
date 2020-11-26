@@ -57,6 +57,8 @@ extern char UserIDBuf[16];
 
 extern char CCID[21];
 extern char IMEI[16];	
+extern char Lac[5];
+extern char Cid[9];
 extern u32  speed_gprs;
 
 int Usr_Atoi(char *pSrc);

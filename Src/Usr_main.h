@@ -34,6 +34,7 @@
 #include "Usr_Upgrade.h"
 #include "Usr_iic.h"
 #include "Usr_gps.h"
+#include "Usr_adc.h"
 #include "MD5.h"
 
 #define USR_RTT_DEBUG	1			//为1时，使用RTT输出printf；为0时，使用串口输出printf
@@ -224,6 +225,8 @@ typedef struct FLAG_
 	unsigned char NeedCloseAgpsConnect:1;   	//需要关闭AGPS网络
 	unsigned char NoSleepMode:1;				//当设定的上传时间间隔小于一定值时，设备不休眠
 	unsigned char RtcInterrupt:1;				//有RTC中断触发标志，用来模拟设备进入stop模式
+
+	unsigned char NeedGetBatVoltage:1;			//需要查询ADC电池电压
 }FLAG;
 #endif
 

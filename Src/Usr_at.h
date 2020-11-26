@@ -35,7 +35,8 @@ typedef enum{
 	AT_QIMODE,AT_QILOCIP,AT_QIDNSIP,AT_QGNSSC,AT_QBTGATSREG,
 	AT_QBTGATSS,AT_QBTGATSC_1,AT_QBTGATSD,AT_QBTGATSC_2,AT_QBTGATSST,
 	AT_QBTGATSRSP,AT_QINDI,AT_QIRD_0,AT_QIRD_1,AT_QIFGCNT,AT_QGNSSTS,
-	AT_QGNSSEPO,AT_QGEPOAID,AT_QICLOSE_AGPS,AT_CIPSHUT,AT_QICLOSE
+	AT_QGNSSEPO,AT_QGEPOAID,AT_QICLOSE_AGPS,AT_CIPSHUT,AT_QICLOSE,
+	AT_CGREG_SET
 }AT_TYPE;
 #endif
 
@@ -69,6 +70,7 @@ extern unsigned  short GprsDataLen;
 extern unsigned char InitCmdTimes;
 extern unsigned short GprsRecDataLen;
 extern unsigned short BatVoltage;
+extern unsigned char Rssi; 
 
 extern char MccMnc[7];				
 	

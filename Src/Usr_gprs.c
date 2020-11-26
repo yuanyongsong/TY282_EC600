@@ -13,9 +13,11 @@ char UserIDBuf[16];
 char GprsSendBuf[DATABUFLEN];
 char UpgradeSendBuf[UPDRADELEN];
 char CCID[21];
-char AtSendbuf[SCIBUFLEN]; /*定义一个数组存储发送数据*/
+char AtSendbuf[SCIBUFLEN]; 		/*定义一个数组存储发送数据*/
 char GprsContent[GPRSCONTLEN];
 char IMEI[16];
+char Lac[5];					//基站LAC
+char Cid[9];					//基站CID
 
 int Usr_Atoi(char *pSrc)
 {
@@ -274,39 +276,33 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 {
 	u16 data_len = 0;				//打包完成后整包数据长度
 	u16 content_len = 0;			//数据包中内容长度
-	u16 mcc_temp = 0;
-	u8	mnc_temp = 0;
-	u16 lac_temp = 0;
 	u16 Degrees = 0;
 	u8  Elevation = 0;
 
-
 	char latTmp[14] = {0};
 	char lonTmp[14] = {0};
-
 	u8 bat_percente = 0;
-	char Temp[50] = {0};
+	u8 csq_temp = 0;
+
 
 	unsigned char gpsValid = 'A';
 
 	LBS_Num = 1;
-	mcc_temp = 460;
-	mnc_temp = 2;
 
 
 	memset(GprsSendBuf, '\0', DATABUFLEN);
 	memset(GprsContent, '\0', GPRSCONTLEN);
 
-	//电池电量低于3.0v认为是没电，高于4.1v认为是满电，中间电量按照电压线性计算
-	if (BatVoltage < 3000)
+	//电池电量低于3.4v认为是没电，高于4.0v认为是满电，中间电量按照电压线性计算
+	if (BatVoltage_Adc < 3400)
 		bat_percente = 0;
 	else
-		BatVoltage -= 3000;
+		BatVoltage -= 3400;
 
-	if (BatVoltage > 1100)
+	if (BatVoltage > 600)
 		bat_percente = 100;
 	else
-		bat_percente = BatVoltage / 11;
+		bat_percente = BatVoltage / 6;
 
 	if (Flag.HaveGPS)
 	{
@@ -315,6 +311,19 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 	else
 	{
 		gpsValid = 'V';
+	}
+
+	if((Rssi > 30)&&(Rssi != 99))
+	{
+		csq_temp = 100;
+	}
+	else if((Rssi <= 30) && (Rssi >= 1))
+	{
+		csq_temp = (u8)((float)Rssi * 3.3);
+	}
+	else
+	{
+		csq_temp = 0;
 	}
 
 	PacketSerialNum ++;
@@ -354,9 +363,9 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 		break;
 
 	case DATA:
-		sprintf(GprsContent, "LOCA:G;CELL:1,1cc,2,2795,1435,64;GDATA:%c,%d,%d%d%d%d%d%d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:89,98;WAY:0",
-				gpsValid,CurSateCnt,Rtc.year,Rtc.mon,Rtc.day, 
-				Rtc.hour,Rtc.min,Rtc.sec,latTmp,lonTmp,speedByte,Degrees,Elevation);
+		sprintf(GprsContent, "LOCA:G;CELL:1,1cc,2,%s,%s,%d;GDATA:%c,%d,%d%d%d%d%d%d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:%d,%d;WAY:0",
+				Lac,Cid,csq_temp,gpsValid,CurSateCnt,Rtc.year,Rtc.mon,Rtc.day, 
+				Rtc.hour,Rtc.min,Rtc.sec,latTmp,lonTmp,speedByte,Degrees,Elevation,bat_percente,csq_temp);
 		break;
 
 	case UPGRESULT:
@@ -364,7 +373,7 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 		break;
 
 	case HAND:
-		sprintf(GprsContent, "#SYNC:%04X;STATUS:0001",GprsSend.handsendcnt);
+		sprintf(GprsContent, "#SYNC:%04X;STATUS:%d,%d",GprsSend.handsendcnt,bat_percente,csq_temp);
 		break;
 
 	default:
