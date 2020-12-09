@@ -39,6 +39,11 @@ typedef struct{
 	unsigned short  BkSendCnt;          //已发断点计数
 	unsigned int  	BkSendLen;          //已发断点字长计数，单位byte
 	unsigned int  	Interval;           //定位包上传间隔,单位是秒	
+	unsigned char   ShutDownHour;		//关机时间段，小时
+	unsigned char   ShutDownMin;		//关机时间段，分钟
+	unsigned char   BootHour;			//开机时间段，小时
+	unsigned char   BootMin;			//开机时间段，分钟
+
 }FS;
 #endif
 

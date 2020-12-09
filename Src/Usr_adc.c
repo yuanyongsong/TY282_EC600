@@ -12,6 +12,7 @@ void Adc_init(void)
 
 	/* Turn on ADC1 as peripheral */
 	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_ADC);
+
 	/* Clock selection */
 	LL_ADC_SetClock(ADC1, LL_ADC_CLOCK_SYNC_PCLK_DIV4);
 	/* ADC Calibration */
@@ -43,12 +44,32 @@ u16 Adc_Value_Get(void)
 	uint16_t voltage = 0;
 
 	LL_ADC_REG_StartConversion(ADC1);
-	while(!LL_ADC_IsActiveFlag_EOC(ADC1));
+//	while(!LL_ADC_IsActiveFlag_EOC(ADC1));
+	delay_ms(5);
 	val = LL_ADC_REG_ReadConversionData12(ADC1);
 	voltage = __LL_ADC_CALC_DATA_TO_VOLTAGE(VDDA_APPLI, val, LL_ADC_RESOLUTION_12B);
 	return voltage;
 }
 
 
+void Close_ADC(void)
+{
+	LL_ADC_Disable(ADC1);//关闭ADC
+	LL_ADC_ClearFlag_ADRDY(ADC1);//清除ADRDY标志
+}
 
+void Open_ADC(void)
+{
+  if (LL_ADC_IsEnabled(ADC1) == 0)//检测ADC1是否开启
+  {
+    LL_ADC_SetLowPowerMode(ADC1, LL_ADC_LP_MODE_NONE);//禁用ADC1深断电模式
 
+    LL_ADC_EnableInternalRegulator(ADC1);//开启ADC1内部电压调节器
+    delay_us(20);
+    LL_ADC_StartCalibration(ADC1);//运行ADC自动校正
+    while (LL_ADC_IsCalibrationOnGoing(ADC1) != 0){}//等待ADC校准结束
+    delay_us(20);
+    LL_ADC_Enable(ADC1);//开启ADC
+    while (LL_ADC_IsActiveFlag_ADRDY(ADC1) == 0){}//等待ADC准备好
+  }
+}

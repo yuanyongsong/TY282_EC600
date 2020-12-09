@@ -16,6 +16,7 @@
 
 #define 	SDA_ST				LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_10)
 
+
 void IIC_Init(void);
 void CCS811_Test(void);
 void G_ensor_Test(void);

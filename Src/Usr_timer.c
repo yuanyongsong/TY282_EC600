@@ -13,6 +13,12 @@ unsigned char ResetLeftCnt;  //该变量为重启设备倒计时。被赋值之�
 unsigned int AtDelayCnt; 	 //AT指令发送成功后延时多久发送下一条指令，通常AT指令处理处理完成后会清零该位，取消等待
 unsigned int IntervalTemp;   //用来暂存定时上传时间间隔
 unsigned short WakeupCnt;	 //RTC中断次数，用于唤醒系统
+unsigned char WakeUpType;	//设备唤醒原因，1为需要上传心跳包唤醒，2为需要上传定位包唤醒，3为震动唤醒
+
+unsigned char NowHour;		//由时间戳计算出来的当前的小时，用于自动开关机
+unsigned char NowMin;		//由时间戳计算出来的当前分钟，用于自动开关机
+
+unsigned char WakeUpType;
 
 unsigned char AT_CBC_IntervalTemp; 	//电池电量采样间隔
 
@@ -180,7 +186,7 @@ void TIMER_SecCntHandle(void)
 		}
 	}
 
-
+	 
 	if((baseTimeSec % 30 == 0) && (Flag.InCharging == 0))
 	{
 		Flag.SensorLed = 1;
@@ -340,7 +346,7 @@ void TIMER_SecCntHandle(void)
 		OpenGpsCnt--;
 	}
 		
-	if (GprsSend.posTimer < IntervalTemp)
+	if (GprsSend.posTimer < Fs.Interval)
 	{
 		GprsSend.posTimer++;
 	}
@@ -566,7 +572,14 @@ void TIMER_RtcHandle(void)
 	}
 }
 
+void GetTimeFormTimeTamp(unsigned int time_stamp)
+{
+	unsigned int TimeTemp = 0;
 
+	TimeTemp = time_stamp % (24*3600);
+	NowHour = TimeTemp / 3600;
+	NowMin = (TimeTemp % 3600)/60;
+}
 
 /*
  * 函数名称: RTC_Wake_Init
@@ -635,19 +648,75 @@ void RTC_TAMP_IRQHandler(void)
 
 		WakeupCnt ++;
 		Timestamp += 60;
+		NoShockCnt += 60;
 
 		if (Flag.ModuleSleep)
 		{
 			Flag.RtcInterrupt = 1;
-		}		
+		}
 
-		if ((Flag.ModuleSleep)&&((WakeupCnt % (Fs.Interval/60) == 0)||(WakeupCnt % 5 == 0)))
+		//如果开启了自动开关机功能，如果在关机时间段内，系统只会周期性唤醒，更新时间戳，不会执行其他操作
+		if((Fs.ModeSet & AUTO_SHUTDOWN) && (Timestamp > 0x50000000))		//确认时间戳已经有效
+		{
+			GetTimeFormTimeTamp(Timestamp);
+
+			if((((NowHour > Fs.ShutDownHour) || ((NowHour == Fs.ShutDownHour) && (NowMin >= Fs.ShutDownMin)))\
+			&& (((NowHour < Fs.BootHour) ||((NowHour == Fs.BootHour) && (NowMin <= Fs.BootMin))))))
+			{
+				Flag.InNoShockSleep = 1;
+				//如果设备在休眠，需要唤醒一下，关闭Gsensor
+				if((Flag.ModuleSleep) && (!Flag.GsensorClose))			
+				{			
+					Flag.ModuleSleep = 0;
+					Flag.ModuleWakeup = 1;
+					WakeUpType = 0;				//设置唤醒类型为0，唤醒后不会开启模块
+				}		
+			}
+			else if(Flag.InNoShockSleep)
+			{
+				//从关机模式下退出来的时候，深度休眠标志位通常已经置位，需要清除一下
+				Flag.DeviceInDeepSleep = 0;		
+				Flag.InNoShockSleep = 0;
+				NoShockCnt = 0;
+			}
+		
+		}
+
+		if(Flag.InNoShockSleep)		return;			//如果是处于自动关机期间，不再周期性唤醒上传数据
+
+		if ((Flag.ModuleSleep)&&!Flag.DeviceInDeepSleep)		//如果还有震动没有进入深度睡眠，周期性上传定位包和心跳包
         {
-            Flag.ModuleSleep = 0;
-            Flag.ModuleWakeup = 1;
-			Flag.IrNoNeedWakeUp = 0;
-            ActiveTimer = 100;
+			if(WakeupCnt % (Fs.Interval/60) == 0)
+			{
+				WakeUpType = 2;
+				
+				Flag.ModuleSleep = 0;
+				Flag.ModuleWakeup = 1;
+				Flag.IrNoNeedWakeUp = 0;
+				ActiveTimer = 100;
+			}
+			else if(WakeupCnt % 5 == 0)
+			{
+				WakeUpType = 1;
+
+				Flag.ModuleSleep = 0;
+				Flag.ModuleWakeup = 1;
+				Flag.IrNoNeedWakeUp = 0;
+				ActiveTimer = 100;
+			}
+
         } 
+
+		//休眠期间
+		if(Flag.ModuleSleep)
+		{
+			if(NoShockCnt >= 300)
+			{
+				Flag.DeviceInDeepSleep = 1;
+			}
+		}
+
+
 	}
 }
 

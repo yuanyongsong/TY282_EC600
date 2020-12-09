@@ -10,7 +10,7 @@ unsigned short WaitAtTime;		//等待AT超时时间，默认是75，可以根据�
 unsigned char WatchDogCnt = 0; 
 unsigned char AtTimeOutCnt; 	//AT超时次数，超时三次重启模块
 unsigned char NeedModuleReset;
-unsigned short NoShockCnt;		//没有振动计时，用于处理地下停车场长期无网络时不循环重启模块问题
+unsigned short NoShockCnt;		//没有振动计时，用于处理地下停车场长期无网络时不循环重启模块问题及进入深度睡眠
 unsigned char ModePwrDownCnt;	//执行关机操作后等待模块回应关机消息倒计时
 unsigned char CheckModeCnt;		//模块开机后，等待主动上报内容，超过10秒，跳过等待，直接开始发送AT指令
 const unsigned char SoftwareBuilt[50] = {0};
@@ -84,7 +84,12 @@ void Usr_InitHardware(void)
 	UART_Init();
 	TIMER_Init();
 	IIC_Init();
-	Adc_init();
+
+	//注意这里，ADC从停止模式唤醒时，不需要再次初始化
+	if(Flag.Insleeping == 0)
+	{
+		Adc_init();
+	}
 }
 
 
@@ -109,10 +114,11 @@ void Usr_InitValue(void)
 	Flag.NeedGetIMEI = 1;
 	Flag.NeedcheckCCID = 1;
 	Flag.NeedReloadAgps = 1;
+	Flag.NeedGetMccMnc = 1;
 	AT_CBC_IntervalTemp = 20;
-	ActiveTimer = ACTIVE_TIME;
+	Flag.NeedScanWifi = 1;
 	
-	memset(MccMnc, '\0', 7);
+	ActiveTimer = ACTIVE_TIME;
 
 	AtType = AT_NULL;
 	Flag.WaitAtAck = 0;
@@ -204,5 +210,6 @@ void Flag_Check(void)
 		BatVoltage_Adc = (u16)(BatVoltage_Adc * 478/100);		//转换成电池电压,1M和270k分压，采样值*（1.27/0.27）=采样值*4.7,修正到4.78
 		printf("\r\nThe battery voltage is %d mv\r\n",BatVoltage_Adc);
 	}
+
 }
 

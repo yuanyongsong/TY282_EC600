@@ -352,8 +352,7 @@ void GPIO_Init_Before_Shutdown(void)
 void StopMode_TurnOff_Some_GPIOs(void)
 {
     LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-
+//    LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
 	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_ALL);
 
     //不关闭PA13和PA14
@@ -374,10 +373,25 @@ void StopMode_TurnOff_Some_GPIOs(void)
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = LL_GPIO_PIN_ALL;
+    GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_3));
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+#if 0
+    //震动传感器脚维持中断
+    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTD, LL_EXTI_CONFIG_LINE3);
+
+    EXTI_InitStruct.Line_0_31 = LL_EXTI_LINE_3;
+    EXTI_InitStruct.LineCommand = ENABLE;
+    EXTI_InitStruct.Mode = LL_EXTI_MODE_IT;
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING;
+    LL_EXTI_Init(&EXTI_InitStruct);
+
+    LL_GPIO_SetPinPull(GPIOD, LL_GPIO_PIN_3, LL_GPIO_PULL_NO);
+    LL_GPIO_SetPinMode(GPIOD, LL_GPIO_PIN_3, LL_GPIO_MODE_INPUT);
+    NVIC_SetPriority(EXTI2_3_IRQn, 2);
+    NVIC_EnableIRQ(EXTI2_3_IRQn);
+#endif
 }
 
 void StopMode_TurnOn_Some_GPIOs(void)
@@ -426,6 +440,19 @@ void EXTI2_3_IRQHandler(void)
     if (LL_EXTI_IsActiveFallingFlag_0_31(LL_EXTI_LINE_3) != RESET)
     {
         LL_EXTI_ClearFallingFlag_0_31(LL_EXTI_LINE_3);
+        if(Flag.ModuleSleep)
+        {
+            if(Flag.DeviceInDeepSleep)
+            {
+                WakeUpType = 3;
+                Flag.DeviceInDeepSleep = 0; 
+                Flag.ModuleSleep = 0;
+                Flag.ModuleWakeup = 1;
+			    ActiveTimer = 120;
+            }
+        }
+
+        NoShockCnt = 0;
     }
 }
 

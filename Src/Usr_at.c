@@ -17,7 +17,8 @@ char BatValue[5];
 unsigned char Rssi; 			//gsm信号强度原始数据
 unsigned short BatVoltage;		//电池电压，这里使用模块供电电压作为电池电压计算电池剩余电量
 char CsqValue[12];
-char MccMnc[7];
+char Mcc[7];
+char Mnc[7];
 unsigned short MCC_hex;			//MCC十六进制值
 unsigned short MNC_hex;			//MNC十六进制值
 
@@ -149,7 +150,7 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		break;
 
 	case AT_QNTP:
-		strcpy(pDst, "AT+QNTP=3,\"210.72.145.44\",123\r\n");
+		strcpy(pDst, "AT+QNTP=1,\"ntp1.aliyun.com\"\r\n");
 		TIMER_AtDelay(3);
 		break;
 
@@ -284,6 +285,11 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		TIMER_AtDelay(3);
 		break;
 
+	case AT_QWIFISCAN:
+		strcpy(pDst, "AT+QWIFISCAN=20000,3,5,10,1\r\n"); //wifi扫描
+		TIMER_AtDelay(3);
+		break;
+
 	default:
 		break;
 	}
@@ -300,12 +306,12 @@ unsigned char AT_InitReceive(AT_TYPE *temType, char *pSrc)
 		AtDelayCnt = 0;
 		if (*temType == AT_ATE)
 		{
-			*temType = AT_CLIP;
-			if (0 == Flag.HaveSmsReady)
-			{
-				Flag.HaveSmsReady = 1;
-			}
+			*temType = AT_AT;
 		}
+		else if (*temType == AT_AT)
+		{
+			*temType = AT_CLIP;
+		}		
 		else if (*temType == AT_CLIP)
 		{
 			*temType = AT_COLP;
@@ -343,6 +349,10 @@ unsigned char AT_InitReceive(AT_TYPE *temType, char *pSrc)
 			*temType = AT_CPMS;
 		}
 		else if (*temType == AT_CPMS)
+		{
+			*temType = AT_COPS;
+		}
+		else if (*temType == AT_COPS)
 		{
 			*temType = AT_QCFG;
 		}
@@ -886,17 +896,36 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 
 	case AT_COPS_CHECK:
 	{
+		char data_temp[10] = {0};
 		//+COPS: 0,2,"46000",3
 		if ((p1 = strstr(pSrc, "+COPS:")) != NULL)
 		{
 			AtDelayCnt = 0;
 			back = 1;
 			*temType = AT_NULL;
-			if (((p1 = strstr(pSrc, ",\"")) != NULL) && ((ptem = strstr((p1 + 2), "\",")) != NULL) && ((ptem - p1 - 2) < 7))
+
+			p1 = strstr(pSrc, "\"");
+			p1 ++;
+			ptem = strstr(p1, "\"");
+			if(ptem - p1 < 6)
 			{
-				p1 += 2;
-				strncpy(MccMnc, p1, (ptem - p1));
+				memset(Mcc,0,sizeof(Mcc));
+				strncpy(Mcc,p1,3);
+
+				memset(Mnc,0,sizeof(Mnc));
+				strncpy(Mnc,p1+3,2);	
+
+				BcdStr2HexStr(Mcc,data_temp);
+				memset(Mcc,0,sizeof(Mcc));
+				strcpy(Mcc,data_temp);
+
+				memset(data_temp,0,sizeof(data_temp));
+
+				BcdStr2HexStr(Mnc,data_temp);
+				memset(Mnc,0,sizeof(Mnc));
+				strcpy(Mnc,data_temp);				
 			}
+
 		}
 		else if (strstr(pSrc, "ERROR"))
 		{
@@ -1150,6 +1179,59 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 		*temType = AT_NULL;
 		break;
 
+	case AT_QWIFISCAN:
+		//+QWIFISCAN:(-,-,-68,"A8:0C:63:D2:99:B4"6)
+		
+
+		if(strstr(pSrc, "+QWIFISCAN:") != NULL)
+		{
+			char wifi_csq[4] = {0};			//wifi信号强度
+			
+			WifiCnt = 0;	
+			memset(Wifi_Content,0,sizeof(Wifi_Content));
+			p1 = pSrc;
+
+			while (strstr(p1, "+QWIFISCAN:") != NULL)
+			{
+				p1 = strstr(p1, ",");
+				p1 ++;
+				p1 = strstr(p1, ",");
+				p1 ++;
+				ptem = strstr(p1, ",");
+
+				if(ptem - p1 > 4)		break;
+
+				memset(wifi_csq,0,sizeof(wifi_csq));
+				strncat(wifi_csq,p1,ptem - p1);
+
+				p1 = strstr(p1, "\"");
+				p1 ++;
+				ptem = strstr(p1, "\"");
+
+				if(ptem - p1 > 20)		break;
+		
+				strncat(Wifi_Content,p1,ptem - p1);
+				strcat(Wifi_Content,",");
+				strcat(Wifi_Content,wifi_csq);
+				strcat(Wifi_Content,",");
+
+				WifiCnt ++;
+			}
+
+			for(i = 0;i < strlen(Wifi_Content);i++)
+			{
+				if(Wifi_Content[i] == ':')	Wifi_Content[i] = '-';
+			}
+			Wifi_Content[i - 1] = 0;		//去掉末尾的','
+
+			Flag.GetScanWifi = 1;
+
+			back = 1;
+			AtDelayCnt = 0;
+			*temType = AT_NULL;
+		}
+	break;
+
 	default:
 		break;
 	}
@@ -1313,6 +1395,20 @@ void Flag_check(void)
 	{
 		Flag.NeedCloseAgpsConnect = 0;
 		AtType = AT_QICLOSE_AGPS;
+		return;
+	}
+
+	if (Flag.NeedGetMccMnc && Flag.PsSignalOk)
+	{
+		Flag.NeedGetMccMnc = 0;
+		AtType = AT_COPS_CHECK;
+		return;
+	}
+
+	if (Flag.NeedScanWifi)
+	{
+		Flag.NeedScanWifi = 0;
+		AtType = AT_QWIFISCAN;
 		return;
 	}
 }

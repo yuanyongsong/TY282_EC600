@@ -101,9 +101,14 @@ static void FS_FactroyValue(void)
 	Fs.BKSavedCnt = 0;
 	Fs.BkSendCnt = 0;
 	Fs.BkSendLen = 0;
-	Fs.Interval = 1800;
+	Fs.Interval = 180;
 	Fs.HaveSetApn = 0;
 	Fs.Sensor = 0x10;
+	Fs.ModeSet = 0;
+	Fs.ShutDownHour = 0xFF;
+	Fs.ShutDownMin = 0xFF;
+	Fs.BootHour = 0xFF;
+	Fs.BootMin = 0xFF;
 
 	
 	Flag.HaveGetMccMnc = 0;

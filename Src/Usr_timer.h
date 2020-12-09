@@ -9,6 +9,7 @@ extern unsigned char baseTimeSec;
 extern unsigned int  baseSecCnt;
 extern unsigned int  AtDelayCnt; 
 extern unsigned short WakeupCnt;
+extern unsigned char WakeUpType;
 
 #ifndef USR_RTC
 #define USR_RTC

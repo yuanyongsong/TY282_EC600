@@ -1,7 +1,17 @@
 #include "usr_main.h"
 
-unsigned char ResetMouldeCnt_1; //模块因为没有信号重启次数
+unsigned char ResetMouldeCnt_1; 	//模块因为没有信号重启次数
 
+
+
+//将十进制的字符串转换为十六进制的字符串,最大转换0xFFFFFFFF对应的十进制长度
+void BcdStr2HexStr(char *pSrc, char *pDst)
+{
+	u32 TempData = 0;
+
+	TempData = (u32)atoi(pSrc);
+	sprintf(pDst,"%x",TempData);
+}
 
 void Usr_ModuleGoSleep(void)
 {
@@ -11,21 +21,38 @@ void Usr_ModuleGoSleep(void)
 	}
 
 	Flag.ModuleWakeup = 0;
-	Flag.Insleeping = 1;
 	Flag.ModuleSleep = 1;
 	Flag.NeedModuleOff = 1;
 	Flag.IsGpsOn = 0;
+
 	GREEN_OFF;
 	RED_OFF;
 	Usr_ModuleTurnOff();
-	printf("\r\nsystem sleep!\r\n");
+	if(NoShockCnt >= 300)
+	{
+		printf("\r\nsystem go to deep sleep!\r\n");
+	}
+	else
+	{
+		printf("\r\nsystem sleep!\r\n");
+	}
+	
 	LL_mDelay(100);		//留一个时间窗口给串口打印数据
 	POWER_OFF;
 	GPS_OFF;
-	G_Sensor_Pwr(0);
+//	Close_ADC();
+	if(Flag.InNoShockSleep)
+	{
+		G_Sensor_Pwr(0);
+		Flag.GsensorClose = 1;
+		printf("Auto shut down\r\n");
+	}
 	Sys_Setting_Before_StopMode();
+
+	Flag.Insleeping = 1;						//在要进入休眠时再置位该标志
+
 sleep:
-	#if 1
+	#if 0
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
 	LL_LPM_EnableDeepSleep();
 	__WFI();
@@ -40,14 +67,19 @@ sleep:
 	Flag.RtcInterrupt = 0;
 	#endif
 
-	//在周期唤醒上传定位数据和5分钟唤醒一次上传心跳包时唤醒系统
-	if((WakeupCnt % (Fs.Interval/60) != 0)&&(WakeupCnt % 5 != 0))		
+	
+	if(Flag.ModuleWakeup == 0)		
 	{
 		goto sleep;
 	}
 
 	Usr_InitHardware();
-	G_Sensor_Pwr(1);
+	if(Flag.GsensorClose)
+	{
+		G_Sensor_Pwr(1);
+		Flag.GsensorClose = 0;
+	}
+	
 
 }
 
@@ -61,21 +93,27 @@ void Usr_ModuleWakeUp(void)
 //	Flag.BatChk = 1;
 	Flag.HaveSynRtc = 0;
 	Flag.NtpGetCCLK = 1;
-	Flag.NeedModuleOn = 1;
 	Flag.NeedUpdateFs = 1;
+	Flag.NeedGetMccMnc = 1;
+	Flag.CsqChk = 1;
 
-	if(WakeupCnt % (Fs.Interval/60) == 0)
+	if((WakeUpType == 2)||(WakeUpType == 3))
 	{
+		WakeUpType = 0;
 		GprsSend.posCnt = 1;
 		GprsSend.posFlag = 1;
 		NoGpsRestartCnt = 0;			//唤醒的时候需要清0未搜索到gps计数
 		Flag.NeedGpsOpen = 1;
+		Flag.NeedScanWifi = 1;
+		Flag.NeedModuleOn = 1;
 		printf("\r\n Need send Location data\r\n");
 	}
-	else if(WakeupCnt % 5 == 0)
+	else if(WakeUpType == 1)
 	{
+		WakeUpType = 0;
 		GprsSend.handFlag = 1;
 		Flag.NeedGpsOpen = 0;
+		Flag.NeedModuleOn = 1;
 		printf("\r\n Need send Hand data\r\n");
 	}
 
@@ -263,7 +301,7 @@ void Usr_Device_ShutDown(void)
 	}
 
 
-	printf("\r\nLow battery,Device ShutDown!\r\n");
+	printf("\r\nDevice ShutDown!\r\n");
 
 	Flag.NeedModuleOff = 1;
 	Usr_ModuleTurnOff();				//关模块

@@ -50,6 +50,8 @@ extern unsigned short ConnectDelayCnt;
 extern unsigned char  Upd_command_len;
 extern unsigned short At_Timeout_Cnt;
 extern unsigned int  ActiveTimer;  
+extern unsigned char WifiCnt;
+
 extern char GprsSendBuf[DATABUFLEN];
 extern char AtSendbuf[SCIBUFLEN];
 extern char UpgradeSendBuf[UPDRADELEN];
@@ -59,15 +61,14 @@ extern char CCID[21];
 extern char IMEI[16];	
 extern char Lac[5];
 extern char Cid[9];
+extern char Wifi_Content[200];
 extern u32  speed_gprs;
+extern u8   WifiCnt;
 
 int Usr_Atoi(char *pSrc);
-void GPRS_Send_CC888(void);
-void GPRS_Send_CC828(void);
 void GPRS_SaveBreakPoint(void);
 void StrAscii2Hex(char *pSrc,char *pDst,u16 Srclen);
-void WIRELESS_GprsReceive_CC828(char *pSrc,u16 len);
-void WIRELESS_GprsReceive(char *pSrc,u16 len);
+void WIRELESS_GprsReceive(char *pSrc);
 void WIRELESS_Handle(void);
 
 u32 Ascii2Hex(char *pSrc,unsigned char srcLen);

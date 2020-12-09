@@ -185,11 +185,6 @@ void At_Receive(void)
 		Flag.NeedShutDown = 1;
 	}
 
-	if (strstr(Uart1Buf, "+SMSUB:")) //有来自平台信息
-	{
-		WIRELESS_GprsReceive(Uart1Buf, Uart1Index);	
-	}
-
 	//有上报NTP时间同步完成时发送查询指令查询网络时间
 	if (strstr(Uart1Buf, "+QNTP: 0,"))
 	{
@@ -213,7 +208,7 @@ void At_Receive(void)
 	//有来自平台信息
 	if (strstr(Uart1Buf, "\"recv\",1")) 
 	{
-//		WIRELESS_GprsReceive(AtBuf, AtIndex);
+		WIRELESS_GprsReceive(Uart1Buf);
 	}
 }
 

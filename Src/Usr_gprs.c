@@ -8,6 +8,7 @@ unsigned char Upd_command_len;	//远程升级时，发送数据包长度
 unsigned short At_Timeout_Cnt;	//等待AT超时的时间，用于等待非标准超时时间时使用
 unsigned short PacketSerialNum;	//发送数据包流水号
 unsigned int ActiveTimer;
+unsigned char WifiCnt;			//搜索到的wifi数量
 u32  speed_gprs;
 char UserIDBuf[16];
 char GprsSendBuf[DATABUFLEN];
@@ -18,6 +19,8 @@ char GprsContent[GPRSCONTLEN];
 char IMEI[16];
 char Lac[5];					//基站LAC
 char Cid[9];					//基站CID
+char Wifi_Content[200];			//搜索到的wifi的MAC地址
+u8   WifiCnt;					//搜索到的WiFi个数
 
 int Usr_Atoi(char *pSrc)
 {
@@ -293,16 +296,16 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 	memset(GprsSendBuf, '\0', DATABUFLEN);
 	memset(GprsContent, '\0', GPRSCONTLEN);
 
-	//电池电量低于3.4v认为是没电，高于4.0v认为是满电，中间电量按照电压线性计算
-	if (BatVoltage_Adc < 3400)
+	//电池电量低于3.5v认为是没电，高于4.1v认为是满电，中间电量按照电压线性计算
+	if (BatVoltage_Adc < 3500)
 		bat_percente = 0;
 	else
-		BatVoltage -= 3400;
+		BatVoltage_Adc -= 3500;
 
-	if (BatVoltage > 600)
+	if (BatVoltage_Adc > 600)
 		bat_percente = 100;
 	else
-		bat_percente = BatVoltage / 6;
+		bat_percente = BatVoltage_Adc / 6;
 
 	if (Flag.HaveGPS)
 	{
@@ -363,9 +366,20 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 		break;
 
 	case DATA:
-		sprintf(GprsContent, "LOCA:G;CELL:1,1cc,2,%s,%s,%d;GDATA:%c,%d,%d%d%d%d%d%d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:%d,%d;WAY:0",
-				Lac,Cid,csq_temp,gpsValid,CurSateCnt,Rtc.year,Rtc.mon,Rtc.day, 
-				Rtc.hour,Rtc.min,Rtc.sec,latTmp,lonTmp,speedByte,Degrees,Elevation,bat_percente,csq_temp);
+		if(Flag.HaveGPS)
+		{
+			sprintf(GprsContent, "LOCA:G;CELL:1,%s,%s,%s,%s,%d;GDATA:%c,%d,%d%d%d%d%d%d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:%d,%d",
+					Mcc,Mnc,Lac,Cid,csq_temp,gpsValid,CurSateCnt,Rtc.year,Rtc.mon,Rtc.day, 
+					Rtc.hour,Rtc.min,Rtc.sec,latTmp,lonTmp,speedByte,Degrees,Elevation,bat_percente,csq_temp);
+		}
+		else if(Flag.GetScanWifi)
+		{
+			Flag.GetScanWifi = 0;
+			
+			sprintf(GprsContent, "LOCA:W;WIFI:%d,%s;ALERT:0000;STATUS:%d,%d",
+					WifiCnt,Wifi_Content,bat_percente,csq_temp);			
+		}
+
 		break;
 
 	case UPGRESULT:
@@ -402,14 +416,27 @@ void GPRS_Send_Handle(void)
 	}
 
 	
-	if ((GprsSend.posCnt > 0) && (GprsSend.posFlag) && (Flag.HaveGPS))
+	if ((GprsSend.posCnt > 0) && (GprsSend.posFlag))
 	{
-		AtType = AT_QISEND;
-		GprsType = DATA;
-		GprsSend.posCnt = 0;
-		GprsSend.posFlag = 0;
-		return;
+		//GPS定位到了立即使用GPS上传位置信息，如果一直没有定位到，在休眠前10秒上传wifi信息
+		if(Flag.HaveGPS)
+		{
+			AtType = AT_QISEND;
+			GprsType = DATA;	
+			GprsSend.posCnt = 0;
+			GprsSend.posFlag = 0;	
+			return;
+		}
+		else if(!Flag.HaveGPS && Flag.GetScanWifi && ActiveTimer <= 10)
+		{
+			AtType = AT_QISEND;
+			GprsType = DATA;	
+			GprsSend.posCnt = 0;
+			GprsSend.posFlag = 0;	
+			return;
+		}
 	}
+
 
 	if(GprsSend.handFlag)
 	{
@@ -518,55 +545,99 @@ void Itoa(unsigned char src, char dst[])
 	} while (i--);
 }
 
-void WIRELESS_GprsReceive(char *pSrc, u16 len)
+void WIRELESS_GprsReceive(char *pSrc)
 {
 	char *p0 = NULL;
 	char *p1 = NULL;
 	char gprs_content[100] = {0};
 
-	p0 = strstr(pSrc,"\"con\":");
-	p0 += 7;
+	p0 = strstr(pSrc,"S168");
+	p1 = strstr(p0,"$");
 	if(p0 != NULL)
 	{
-		p1 = strstr(p0,"}}");
 		if(p1 != NULL)
 		{
-			strncpy(gprs_content, p0, p1 - p0 - 1);
+			strncpy(gprs_content, p0, p1 - p0 + 1);
 			printf("\r\nRecvice the data form service: %s\r\n",gprs_content);
-			//远程升级：c18:4-W686IB_V0.0.1.bin-9caf17aecfcf907bc85ad1c187cb255b
-			if(p0 == strstr(p0,"c18"))
-			{
-				p0 = strstr(p0,"-");
-				p0 ++;
-				p1 = strstr(p0,"-");
-				//获取文件名称
-				memset(FsUpg.AppFilePath,0,sizeof(FsUpg.AppFilePath));
-				strcpy(FsUpg.AppFilePath,"/fw/");
-				strncat(FsUpg.AppFilePath,p0,p1 - p0);
-				
-				#if 1
-				if((memcmp(p0,"W686",4) !=0 )||(strstr(FsUpg.AppFilePath,".bin") == NULL))
-				{
-					printf("Illegal file name!\r\n");
-					return;
-				}
-				#endif
-				printf("Need upgrade the device,upgrade file name is: %s",FsUpg.AppFilePath);
-				p0 = p1 + 1;
-				memset(Md5FileAsc,0,sizeof(Md5FileAsc));
-				memcpy(Md5FileAsc,p0,32);
 
-				memset(FsUpg.AppIpAdress,0,sizeof(FsUpg.AppIpAdress));
-				strcpy(FsUpg.AppIpAdress,"http://stg-fota.mamosearch.com:80");
-				MD5Init(&Upgmd5);  
-				UpgInfo.NeedUpdata = 1;
-				UpgInfo.RetryCnt = 2;
-			}
 		}
 		else
 		{
 			printf("\r\nRecvice data format incorrect!\r\n");
 			return;
+		}
+		//修改传感器灵敏度
+		if((p0 = strstr(pSrc,"GSENSOR,")) != NULL)
+		{
+			p0 += 8;
+			if(*p0 == '0')
+			{
+				G_Sensor_Pwr(0);
+				Fs.ModeSet |= NO_SENSOR;
+			} 	
+			else
+			{
+				if(*p0 == '1') 				Fs.Sensor = SENSOR_HIGH;
+				else if(*p0 == '2') 	Fs.Sensor = SENSOR_NORMAL;
+				else if(*p0 == '3') 	Fs.Sensor = SENSOR_LOW;
+
+				G_Sensor_init();
+			}	
+			Flag.NeedUpdateFs = 1;		
+		}
+		//修改上传时间间隔
+		else if((p0 = strstr(pSrc,"RET,UP,")) != NULL)
+		{
+			p0 += 7;
+			Fs.Interval = (u32)atoi(p0);
+			Flag.NeedUpdateFs = 1;				
+		}
+		//重启
+		else if((p0 = strstr(pSrc,"REBOOT")) != NULL)
+		{
+			ResetLeftCnt = 3;			
+		}
+		//关机
+		else if((p0 = strstr(pSrc,"POWERDN")) != NULL)
+		{
+			Flag.NeedShutDown = 1;
+		}
+		//自动开关机
+		else if((p0 = strstr(pSrc,"APOF,")) != NULL)
+		{
+			p0 += 5;
+
+			if(*p0 == '0')			Fs.ModeSet &= ~AUTO_SHUTDOWN;
+			else if(*p0 == '1')		Fs.ModeSet |= AUTO_SHUTDOWN;
+			else 					return;
+
+			p0 = strstr(pSrc,",");
+			p0 ++;
+
+			Fs.ShutDownHour = (u8)atoi(p0);
+
+			p0 = strstr(pSrc,",");
+			p0 ++;
+
+			Fs.ShutDownMin = (u8)atoi(p0);
+
+			p0 = strstr(pSrc,",");
+			p0 ++;
+
+			Fs.BootHour = (u8)atoi(p0);
+
+			p0 = strstr(pSrc,",");
+			p0 ++;
+
+			Fs.BootMin = (u8)atoi(p0);
+
+			Flag.NeedUpdateFs = 1;
+		}
+		//恢复出厂设置
+		else if((p0 = strstr(pSrc,"FACTORY")) != NULL)
+		{
+			Flag.NeedClrValueFile = 1;
+			ResetLeftCnt = 3;	
 		}
 	}
 }

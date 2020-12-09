@@ -37,7 +37,13 @@
 #include "Usr_adc.h"
 #include "MD5.h"
 
-#define USR_RTT_DEBUG	1			//为1时，使用RTT输出printf；为0时，使用串口输出printf
+
+#define SENSOR_HIGH         4
+#define SENSOR_NORMAL       6
+#define SENSOR_LOW          8
+
+#define NO_SENSOR           0x01
+#define AUTO_SHUTDOWN       0x02
 
 typedef enum
 {
@@ -118,6 +124,7 @@ typedef struct FLAG_
 	unsigned char NeedUpdateFs:1;     //需要更新Fs结构体
 	unsigned char FeedbackGprs:1;     //需要应答平台下发数据
 	unsigned char ModuleSleep:1;      //模块进入休眠标记
+	unsigned char NeedGetMccMnc:1;    //已经获取MCCMNC
 	unsigned char HaveGetMccMnc:1;    //已经获取MCCMNC
 	unsigned char HaveCommonMccMnc:1; //已经同步MCCMNC
 	unsigned char UpgrateAppOk:1;      //升级成功标志
@@ -227,6 +234,12 @@ typedef struct FLAG_
 	unsigned char RtcInterrupt:1;				//有RTC中断触发标志，用来模拟设备进入stop模式
 
 	unsigned char NeedGetBatVoltage:1;			//需要查询ADC电池电压
+	unsigned char DeviceInDeepSleep:1;			//设备进入深度休眠，不再唤醒
+	unsigned char NeedScanWifi:1;				//需要扫描周围wifi
+	unsigned char GetScanWifi:1;				//扫描到周围有效wifi信号
+	unsigned char InNoShockSleep:1;				//进入周期性睡眠时间段时，设备休眠，无法通过振动传感器唤醒
+	unsigned char NeedCloseGsensor:1;			//需要关闭G sensor
+	unsigned char GsensorClose:1;				//G sensor关闭
 }FLAG;
 #endif
 
