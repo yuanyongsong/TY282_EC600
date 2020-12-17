@@ -15,7 +15,8 @@ void BcdStr2HexStr(char *pSrc, char *pDst)
 
 void Usr_ModuleGoSleep(void)
 {
-	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup || Flag.NoSleepMode) 
+
+	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup) 
 	{
 		return;
 	}
@@ -27,8 +28,20 @@ void Usr_ModuleGoSleep(void)
 
 	GREEN_OFF;
 	RED_OFF;
-	Usr_ModuleTurnOff();
-	if(NoShockCnt >= 300)
+
+	if(Flag.ModuleOn)
+	{
+		Usr_ModuleTurnOff();
+	}
+
+	if(Flag.InNoShockSleep)
+	{
+		G_Sensor_Pwr(0);
+		Flag.GsensorClose = 1;
+		printf("Auto shut down!\r\n");
+	}
+
+	if(NoShockCnt > 300)
 	{
 		printf("\r\nsystem go to deep sleep!\r\n");
 	}
@@ -41,18 +54,13 @@ void Usr_ModuleGoSleep(void)
 	POWER_OFF;
 	GPS_OFF;
 //	Close_ADC();
-	if(Flag.InNoShockSleep)
-	{
-		G_Sensor_Pwr(0);
-		Flag.GsensorClose = 1;
-		printf("Auto shut down\r\n");
-	}
+
 	Sys_Setting_Before_StopMode();
 
 	Flag.Insleeping = 1;						//在要进入休眠时再置位该标志
 
 sleep:
-	#if 0
+	#if 1
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
 	LL_LPM_EnableDeepSleep();
 	__WFI();
@@ -67,12 +75,23 @@ sleep:
 	Flag.RtcInterrupt = 0;
 	#endif
 
+	//周期性唤醒次数很多时由于没有进主函数清看门狗，会导致系统重启，这里每次唤醒时清除一下
+	WatchDogCnt = 0;		
+
+	SystemClock_Config();
+	TIMER_Init();
 	
-	if(Flag.ModuleWakeup == 0)		
+	while((!Flag.ModuleWakeup) && (KEY0 == 0))			//如果按键按下超过三秒或者按键松开
 	{
-		goto sleep;
+		delay_ms(10);		
 	}
 
+	if(!Flag.ModuleWakeup)			//如果按键按下没超过三秒
+	{
+		SysPoweKeyTimer = 0;
+		goto sleep;
+	}
+	
 	Usr_InitHardware();
 	if(Flag.GsensorClose)
 	{
@@ -104,8 +123,8 @@ void Usr_ModuleWakeUp(void)
 		GprsSend.posFlag = 1;
 		NoGpsRestartCnt = 0;			//唤醒的时候需要清0未搜索到gps计数
 		Flag.NeedGpsOpen = 1;
-		Flag.NeedScanWifi = 1;
 		Flag.NeedModuleOn = 1;
+		WifiScanDelay = 0;				//清除wifi扫描等待
 		printf("\r\n Need send Location data\r\n");
 	}
 	else if(WakeUpType == 1)
@@ -305,12 +324,43 @@ void Usr_Device_ShutDown(void)
 
 	Flag.NeedModuleOff = 1;
 	Usr_ModuleTurnOff();				//关模块
+	G_Sensor_Pwr(0);					//关震动传感器
+	Flag.GsensorClose = 1;
 	GPIO_Init_Before_Shutdown();		//设置GPIO状态
+	Flag.SysShutDown = 1;
 
+stop:
+	#if 1
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
-	LL_LPM_EnableDeepSleep();			//进入停止模式
+	LL_LPM_EnableDeepSleep();
 	__WFI();
 
+	#else
+	LL_TIM_DeInit(TIM3);
+	while(Flag.RtcInterrupt == 0)
+	{
+		delay_ms(100);
+		WatchDogCnt = 0;
+	}
+	Flag.RtcInterrupt = 0;
+	#endif
+
+#if 1
+	SystemClock_Config();
+	TIMER_Init();
+	
+	while((!Flag.NeedDeviceRst) && (KEY0 == 0))			//如果按键按下超过三秒或者按键松开
+	{
+		WatchDogCnt = 0;
+		delay_ms(10);		
+	}
+
+	if(!Flag.NeedDeviceRst)			//如果按键按下没超过三秒
+	{
+		SysPoweKeyTimer = 0;
+		goto stop;
+	}
+#endif
 	NVIC_SystemReset();					//外部充电中断唤醒后直接重启
 }
 

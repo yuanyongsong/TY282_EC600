@@ -21,6 +21,7 @@ char Lac[5];					//基站LAC
 char Cid[9];					//基站CID
 char Wifi_Content[200];			//搜索到的wifi的MAC地址
 u8   WifiCnt;					//搜索到的WiFi个数
+u8	 WifiScanDelay;				//wifi搜索时间间隔
 
 int Usr_Atoi(char *pSrc)
 {
@@ -359,6 +360,8 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 	Degrees=(u16)atoi(DegreesTmp);
 	Elevation = (u16)CurElevation;
 
+	UTCToBeijing(Rtc);
+
 	switch (switch_tmp)
 	{
 	case AGPSDATA:
@@ -368,15 +371,15 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 	case DATA:
 		if(Flag.HaveGPS)
 		{
-			sprintf(GprsContent, "LOCA:G;CELL:1,%s,%s,%s,%s,%d;GDATA:%c,%d,%d%d%d%d%d%d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:%d,%d",
-					Mcc,Mnc,Lac,Cid,csq_temp,gpsValid,CurSateCnt,Rtc.year,Rtc.mon,Rtc.day, 
-					Rtc.hour,Rtc.min,Rtc.sec,latTmp,lonTmp,speedByte,Degrees,Elevation,bat_percente,csq_temp);
+			sprintf(GprsContent, "LOCA:G;CELL:1,%s,%s,%s,%s,%d;GDATA:%c,%d,%02d%02d%02d%02d%02d%02d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:%d,%d",
+					Mcc,Mnc,Lac,Cid,csq_temp,gpsValid,CurSateCnt,Rtc_BJ.year,Rtc_BJ.mon,Rtc_BJ.day, 
+					Rtc_BJ.hour,Rtc_BJ.min,Rtc_BJ.sec,latTmp,lonTmp,speedByte,Degrees,Elevation,bat_percente,csq_temp);
 		}
 		else if(Flag.GetScanWifi)
 		{
 			Flag.GetScanWifi = 0;
 			
-			sprintf(GprsContent, "LOCA:W;WIFI:%d,%s;ALERT:0000;STATUS:%d,%d",
+			sprintf(GprsContent, "LOCA:W;WIFI:%d,%s;ALERT:0000;STATUS:%d,%d;WAY:0",
 					WifiCnt,Wifi_Content,bat_percente,csq_temp);			
 		}
 
@@ -387,7 +390,7 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 		break;
 
 	case HAND:
-		sprintf(GprsContent, "#SYNC:%04X;STATUS:%d,%d",GprsSend.handsendcnt,bat_percente,csq_temp);
+		sprintf(GprsContent, "SYNC:%04X;STATUS:%d,%d",GprsSend.handsendcnt,bat_percente,csq_temp);
 		break;
 
 	default:
@@ -416,7 +419,7 @@ void GPRS_Send_Handle(void)
 	}
 
 	
-	if ((GprsSend.posCnt > 0) && (GprsSend.posFlag))
+	if (((GprsSend.posCnt > 0) || (Flag.NoSleepMode)) && (GprsSend.posFlag))
 	{
 		//GPS定位到了立即使用GPS上传位置信息，如果一直没有定位到，在休眠前10秒上传wifi信息
 		if(Flag.HaveGPS)
@@ -427,13 +430,27 @@ void GPRS_Send_Handle(void)
 			GprsSend.posFlag = 0;	
 			return;
 		}
-		else if(!Flag.HaveGPS && Flag.GetScanWifi && ActiveTimer <= 10)
+		else if(!Flag.HaveGPS && Flag.GetScanWifi)
 		{
 			AtType = AT_QISEND;
 			GprsType = DATA;	
 			GprsSend.posCnt = 0;
 			GprsSend.posFlag = 0;	
 			return;
+		}
+		else if(!Flag.HaveGPS && !Flag.GetScanWifi && (WifiScanDelay == 0))
+		{
+			if(Flag.NoSleepMode)				//如果是不休眠模式，到上传时间没有GPS的情况下，上传wifi
+			{
+				Flag.NeedScanWifi = 1;
+				WifiScanDelay = 10;
+			}
+			else if(ActiveTimer <= 10)			//在休眠模式下，在没有GPS的情况下，在进入休眠前20秒查询wifi
+			{
+				Flag.NeedScanWifi = 1;
+				WifiScanDelay = 10;
+			}
+			
 		}
 	}
 
@@ -577,7 +594,7 @@ void WIRELESS_GprsReceive(char *pSrc)
 			} 	
 			else
 			{
-				if(*p0 == '1') 				Fs.Sensor = SENSOR_HIGH;
+				if(*p0 == '1') 			Fs.Sensor = SENSOR_HIGH;
 				else if(*p0 == '2') 	Fs.Sensor = SENSOR_NORMAL;
 				else if(*p0 == '3') 	Fs.Sensor = SENSOR_LOW;
 
@@ -586,10 +603,19 @@ void WIRELESS_GprsReceive(char *pSrc)
 			Flag.NeedUpdateFs = 1;		
 		}
 		//修改上传时间间隔
-		else if((p0 = strstr(pSrc,"RET,UP,")) != NULL)
+		else if((p0 = strstr(pSrc,"UP,")) != NULL)
 		{
-			p0 += 7;
+			p0 += 3;
 			Fs.Interval = (u32)atoi(p0);
+			if(Fs.Interval < 5)
+			{
+				Fs.Interval = 5;
+			}
+			if(Fs.Interval <=120)
+			{
+				Flag.NoSleepMode = 1;			
+			}
+			
 			Flag.NeedUpdateFs = 1;				
 		}
 		//重启
@@ -611,22 +637,27 @@ void WIRELESS_GprsReceive(char *pSrc)
 			else if(*p0 == '1')		Fs.ModeSet |= AUTO_SHUTDOWN;
 			else 					return;
 
-			p0 = strstr(pSrc,",");
+			p0 = strstr(p0,",");
 			p0 ++;
 
 			Fs.ShutDownHour = (u8)atoi(p0);
 
-			p0 = strstr(pSrc,",");
+			p0 = strstr(p0,",");
 			p0 ++;
 
 			Fs.ShutDownMin = (u8)atoi(p0);
 
-			p0 = strstr(pSrc,",");
+			p0 = strstr(p0,",");
 			p0 ++;
 
 			Fs.BootHour = (u8)atoi(p0);
 
-			p0 = strstr(pSrc,",");
+			if(Fs.BootHour < Fs.ShutDownHour)			//如果时间跨天了，开机时间加24
+			{
+				Fs.BootHour += 24;
+			}
+
+			p0 = strstr(p0,",");
 			p0 ++;
 
 			Fs.BootMin = (u8)atoi(p0);

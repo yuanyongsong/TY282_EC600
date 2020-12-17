@@ -8,7 +8,6 @@
 #define BREAK_PIONT_ADDR_1		0x00010000      //断点保存起始地址
 #define EXFLASH_APP1_ADDR		0x00100000  
 
-#define FLASH_UPG_ADDR	        0x00080000      //远程升级结果存放地址
 #define FLASH_FS_ADDR	        0x001f0000
 #define FLASH_CHECK_ADDR	    0x001ff000
 

@@ -3,12 +3,31 @@
 
 #include "usr_main.h"
 
-#define STM32_FLASH_SIZE 128 	 		//所选STM32的FLASH容量大小(单位为K)
-#define STM32_FLASH_BASE 0x08000000 	//STM32 FLASH的起始地址
-#define BEAKPIONT_ADDR	 0X08020000 - 0x2800	//断点存储位置起始，在最后10k地址处，大小8k用于存放断点
+#define STM32_FLASH_SIZE 	128 	 		//所选STM32的FLASH容量大小(单位为K)
+#define STM32_FLASH_BASE 	0x08000000 	//STM32 FLASH的起始地址
+//#define BEAKPIONT_ADDR	 0X08020000 - 0x2800	//断点存储位置起始，在最后10k地址处，大小8k用于存放断点
 
 //设置FLASH保存数据地址(必须为偶数)
-#define FLASH_SAVE_ADDR  0X08020000 - 0x800		//STMG070RB flash为128K，使用末尾2K作为数据存储区
+#define FLASH_SAVE_ADDR  	0X08020000 - 0x800		//STMG070RB flash为128K，使用末尾2K作为数据存储区
+//远程升级文件存放位置0x08011800，即地70k的位置开始，所以，要求程序大小不得大于57k(12k的BootLoader和末尾2k的数据)
+#define FOAT_SAVE_ADDR  	0x08011800	 //远程升级文件存储的地址段为0x08011800-0x0801F800 共56k，28个扇区
+
+
+#ifndef _FS_UPG
+#define _FS_UPG
+typedef struct{
+	char   	Ok[3];			  			//为"OK"表示从flash读出的数据有效，不是"OK"表示此flash没有初始化
+	char 	AppFilePath[100];   		 //远程升级文件在http服务器上的文件路径
+	char 	AppFileName[50];   		 	//远程升级文件在http服务器上的文件名
+	char   	AppIpAdress[50];   			//远程升级用http地址
+	char   	HttpError[32];				//http下载文件中出现的错误原因
+
+	unsigned char   UpgNeedSendGprs;	//0x01 时要求GPRS回复升级结果	
+	unsigned char   UpgEnJamp;			//0xaa为程序已经更新完毕，可以跳转，0x55为程序接收完毕
+	u32   			AppLenBuf;			//接收数据OK,存EXFLASH长度。
+}FS_UPG;
+
+#endif
 
 
 #ifndef _FS
@@ -29,6 +48,7 @@ typedef struct{
 	char   MccMnc[7];          			//最后的MCCMNC
 	char   LatitudeLast[14]; 			//最后一次定位纬度，整数4位，小数4位，不足补0,最后有'N'或'S'
 	char   LongitudeLast[14];			//最后一次定位经度，整数5位，小数4位，不足补0,最后有'E'或'W'
+	FS_UPG FsUpg;						//远程升级相关
 
 	unsigned char   Sensor;				//灵敏度值
 	unsigned char   ModeSet;            //设备模式设置
@@ -57,7 +77,7 @@ void FS_FactroyValueFile(void);
 void STMFLASH_WriteFs(u32 WriteAddr,u64 *pBuffer,u16 NumToWrite);
 void STMFLASH_Read(u32 ReadAddr, u32 *pBuffer, u16 NumToRead);
 void FSUPG_FactroyValue(void);
-
+void STMFLASH_Write_NoCheck(u32 WriteAddr, u64 *pBuffer, u16 NumToWrite);
 #endif
 
 

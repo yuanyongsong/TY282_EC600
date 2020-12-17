@@ -25,6 +25,7 @@
 ..\output\usr_adc.o: ../Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_usart.h
 ..\output\usr_adc.o: ../Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_gpio.h
 ..\output\usr_adc.o: ../Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_rtc.h
+..\output\usr_adc.o: ..\Src\stm32g0xx_ll_flash.h
 ..\output\usr_adc.o: d:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 ..\output\usr_adc.o: d:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 ..\output\usr_adc.o: d:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h

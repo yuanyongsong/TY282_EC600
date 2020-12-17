@@ -17,6 +17,7 @@
 #include "stm32g0xx_ll_usart.h"
 #include "stm32g0xx_ll_gpio.h"
 #include "stm32g0xx_ll_rtc.h"
+#include "stm32g0xx_ll_flash.h"
 
 #include "stdio.h"
 #include <string.h>
@@ -35,6 +36,7 @@
 #include "Usr_iic.h"
 #include "Usr_gps.h"
 #include "Usr_adc.h"
+#include "Usr_Upgrade.h"
 #include "MD5.h"
 
 
@@ -210,6 +212,7 @@ typedef struct FLAG_
 	unsigned char InCharging:1;					//设备出于充电状态
 	unsigned char SensorLed:1;					//传感器指示sensor灯，为1时表示需要亮一下
 
+	unsigned char SysShutDown:1;				//系统关机
 	unsigned char NeedShutDown:1;				//电池电压达到或者低于设定值时，关机
 	unsigned char NeedSendUpgResult:1;			//需要发送升级结果
 
@@ -240,6 +243,9 @@ typedef struct FLAG_
 	unsigned char InNoShockSleep:1;				//进入周期性睡眠时间段时，设备休眠，无法通过振动传感器唤醒
 	unsigned char NeedCloseGsensor:1;			//需要关闭G sensor
 	unsigned char GsensorClose:1;				//G sensor关闭
+	unsigned char NeedPrintf:1;					//需要打印数据
+	
+
 }FLAG;
 #endif
 
@@ -249,7 +255,7 @@ extern unsigned short ResetCnt;
 extern FLAG Flag;
 extern unsigned char NeedModuleReset;
 extern unsigned char  CheckModeCnt;
-extern unsigned short NoShockCnt;
+extern unsigned int  NoShockCnt;
 extern unsigned char ModePwrDownCnt;
 extern unsigned short WaitAtTime;
 extern char Edition[50];

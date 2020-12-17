@@ -1052,12 +1052,7 @@ void GPS_CopyTimeAndDate(void)
 	//DateBuff TimeBuff保存原始时间数据不变
 	strcpy(HandDBuf, DateBuff);
 	strcpy(HandTBuf, TimeBuff);
-#if 0 //20151215_3
-	if(Fs.TimezoneData[0] && strcmp(Fs.IpAdress,"58.64.155.133") && strcmp(Fs.IpAdress,"d3.igps.info")) //20151215_2
-	{
-		TIME_ChangeUtc();
-	}
-#endif
+
 	make_time();
 
 	HandDBufTQ[0] = HandDBuf[4];
@@ -1178,13 +1173,7 @@ void GPS_DataProcess(char *pSrc)
 					if (speedByte > 3)
 					{
 						MoveData.MoveFisrt = 0;
-
-#if SPEED_GPS
-						IntervalTemp = 10; //有速度后上传时间间隔为10,测试用
-						GprsSend.posCnt = 3;
-						ActiveTimer = ACTIVE_TIME; //有速度的情况下，不要让设备进入休眠
-#endif
-										   
+									   
 						//角度变化判断	20140728_2
 						//速度首次大于2km/h,保存当前角度值
 						if (!Flag.SetDegreeData)
@@ -1207,10 +1196,6 @@ void GPS_DataProcess(char *pSrc)
 					else
 					{
 						Flag.SetDegreeData = 0;
-
-#if SPEED_GPS
-						IntervalTemp = Fs.Interval;
-#endif
 
 						//位移判断	 20140724_1
 						//速度首次减为5km/h以下，可能为堵车，保存当前经纬度

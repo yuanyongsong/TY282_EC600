@@ -28,8 +28,8 @@ typedef enum{
 #define SPEED_GPS		0
 
 
-#define IMEI_MANUAL	"861118010103569"
-//#define IMEI_MANUAL	"352656103473735"
+//#define IMEI_MANUAL	"861118010103569"
+#define IMEI_MANUAL	"000000000000002"
 //#define IMEI_MANUAL	""
 
 
@@ -52,6 +52,7 @@ extern unsigned short At_Timeout_Cnt;
 extern unsigned int  ActiveTimer;  
 extern unsigned char WifiCnt;
 
+
 extern char GprsSendBuf[DATABUFLEN];
 extern char AtSendbuf[SCIBUFLEN];
 extern char UpgradeSendBuf[UPDRADELEN];
@@ -64,6 +65,7 @@ extern char Cid[9];
 extern char Wifi_Content[200];
 extern u32  speed_gprs;
 extern u8   WifiCnt;
+extern u8	WifiScanDelay;
 
 int Usr_Atoi(char *pSrc);
 void GPRS_SaveBreakPoint(void);

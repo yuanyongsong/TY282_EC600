@@ -317,12 +317,10 @@ u8 G_Sensor_init(void)
 
 void G_Sensor_Pwr(u8 state)
 {
-	u8 ret;
-
 	if(state)
-	ret = G_Sensor_Write(0x11,0x10);
+		G_Sensor_Write(0x11,0x10);
 	else	
-	ret = G_Sensor_Write(0x11,0x90);
+		G_Sensor_Write(0x11,0x90);
 }
 
 

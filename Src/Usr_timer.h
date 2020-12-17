@@ -25,8 +25,8 @@ typedef struct {
 #endif
 
 extern Rtc_st Rtc;
+extern Rtc_st Rtc_BJ;
 extern Rtc_st RtcAgpsBackup;
-extern unsigned int IntervalTemp;
 extern unsigned char ResetLeftCnt;
 extern unsigned int  Timestamp;	
 extern unsigned int  baseSecCnt;
@@ -43,6 +43,8 @@ void RTC_Wake_Init(u16 sec);
 void delay_us(unsigned int us);
 void delay_ms(unsigned int ms);
 u8 CompareAgpsRct(Rtc_st RtcNow, Rtc_st RtcBackUp);
+void UTCToBeijing(Rtc_st RtcTemp);
+void RTC_Close(void);
 #endif
 
 

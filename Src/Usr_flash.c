@@ -1,5 +1,4 @@
 #include "usr_main.h"
-#include "stm32g0xx_ll_flash.h"
 //使用stm32的flash模拟eeprom
 FS Fs;
 
@@ -50,6 +49,7 @@ void STMFLASH_Write_NoCheck(u32 WriteAddr, u64 *pBuffer, u16 NumToWrite)
 #endif
 }
 
+
 #define STM_SECTOR_SIZE 2048 //STM32G070一个扇区2K大小
 
 //此函数专用于写Fs数据(地址正是flash的最后一个扇区)
@@ -90,18 +90,18 @@ static void FS_FactroyValue(void)
 	memset(Fs.UbloxIp, '\0', 21);
 	memset(Fs.UbloxPort, '\0', 7);
 
-	strcpy(Fs.IpPort, "7788");
-	strcpy(Fs.IpAdress, "bky.appxmg.com");
-	strcpy(Fs.ApnName, "mtc.gen");
-	strcpy(Fs.GprsUserName, "mtc");
-	strcpy(Fs.GprsPassWord, "mtc");
+	strcpy(Fs.IpPort, "6800");
+	strcpy(Fs.IpAdress, "www.appxmg.com");
+	strcpy(Fs.ApnName, "em");
+	strcpy(Fs.GprsUserName, "");
+	strcpy(Fs.GprsPassWord, "");
 	strcpy(Fs.UbloxIp,"www.gnss-aide.com");
 	strcpy(Fs.UbloxPort,"2621");
 
 	Fs.BKSavedCnt = 0;
 	Fs.BkSendCnt = 0;
 	Fs.BkSendLen = 0;
-	Fs.Interval = 180;
+	Fs.Interval = 300;
 	Fs.HaveSetApn = 0;
 	Fs.Sensor = 0x10;
 	Fs.ModeSet = 0;
@@ -117,15 +117,15 @@ static void FS_FactroyValue(void)
 void FSUPG_FactroyValue(void)
 {
 
-	strcpy(FsUpg.Ok, "OK");
-	memset(FsUpg.AppFilePath, '\0', 50);
-	memset(FsUpg.AppFileName, '\0', 50);
-	memset(FsUpg.AppIpAdress, '\0', 50);
-	memset(FsUpg.HttpError, '\0', 32);
+	strcpy(Fs.FsUpg.Ok, "OK");
+	memset(Fs.FsUpg.AppFilePath, '\0', 50);
+	memset(Fs.FsUpg.AppFileName, '\0', 50);
+	memset(Fs.FsUpg.AppIpAdress, '\0', 50);
+	memset(Fs.FsUpg.HttpError, '\0', 32);
 
-	FsUpg.UpgEnJamp = 0x00;
-	FsUpg.UpgNeedSendGprs = 0x00;
-	FsUpg.AppLenBuf = 0;
+	Fs.FsUpg.UpgEnJamp = 0x00;
+	Fs.FsUpg.UpgNeedSendGprs = 0x00;
+	Fs.FsUpg.AppLenBuf = 0;
 
 	//	EXFLASH_Write((u8 *)&FsUpg, FLASH_UPG_ADDR, sizeof(FsUpg));
 }
@@ -146,8 +146,8 @@ void FS_InitValue(void)
 	//	EXFLASH_ReadArray(FLASH_UPG_ADDR, (char *)&FsUpg, sizeof(FsUpg));
 
 	//flash空白 要初始化
-	//	if ('O' != Fs.Ok[0] || 'K' != Fs.Ok[1])
-	if (strcmp(Fs.IpAdress, "bky.appxmg.com") != 0)
+		if ('O' != Fs.Ok[0] || 'K' != Fs.Ok[1])
+	//if (strcmp(Fs.IpAdress, "bky.appxmg.com") != 0)
 	{
 		strcpy(Fs.UserID, "999999000004"); //这个变量在w686中暂时不使用
 		printf("\r\nFormat the eeprom\r\n");
@@ -156,15 +156,15 @@ void FS_InitValue(void)
 		return;
 	}
 
-	if (FsUpg.UpgEnJamp == 0xaa)
+	if (Fs.FsUpg.UpgEnJamp == 0xaa)
 	{
 		//		Flag.UpgrateAppSuccess = 1;
-		FsUpg.UpgNeedSendGprs = 0;
+		Fs.FsUpg.UpgNeedSendGprs = 0;
 		Flag.NeedUpgradeResultResponse = 1;
 	}
-	else if (FsUpg.UpgNeedSendGprs)
+	else if (Fs.FsUpg.UpgNeedSendGprs)
 	{
-		FsUpg.UpgNeedSendGprs = 0;
+		Fs.FsUpg.UpgNeedSendGprs = 0;
 		Flag.NeedUpgradeResultResponse = 1;
 	}
 
@@ -204,7 +204,7 @@ void FS_UpdateValue(void)
 	}
 	
 }
-
+#if 0
 //擦除用于保存断点扇区，一共8k，预计可以保存100个断点
 void BreakPiont_Save_Init(void)
 {
@@ -213,7 +213,7 @@ void BreakPiont_Save_Init(void)
 	LL_Flash_PageErase(BEAKPIONT_ADDR / STM_SECTOR_SIZE + 2);
 	LL_Flash_PageErase(BEAKPIONT_ADDR / STM_SECTOR_SIZE + 3);
 }
-#if 0
+
 void EXFLSAH_SaveBreakPoint(void)
 {
 	//已达到最大断点保存数目，并且没有上传完，不再保存新断点

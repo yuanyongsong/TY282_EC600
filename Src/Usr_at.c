@@ -290,6 +290,41 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		TIMER_AtDelay(3);
 		break;
 
+	case AT_QHTTPURL:
+		strcpy(pDst, "AT+QHTTPURL=47,80\r\n"); 			//设置链接地址长度及超时时间
+		TIMER_AtDelay(3);
+		break;
+
+	case AT_HTTPURL:
+		strcpy(pDst, "http://47.101.151.253:12306/common/downFirmware\r\n"); 	//发送链接
+		TIMER_AtDelay(3);
+		break;
+
+	case AT_QHTTPGET:
+		strcpy(pDst, "AT+QHTTPGET=80\r\n"); 			//get链接内容
+		TIMER_AtDelay(3);
+		break;
+
+	case AT_QHTTPREADFILE:
+		strcpy(pDst, "AT+QHTTPREADFILE=\"FOTA.bin\",80\r\n"); 			//保存下载文件
+		TIMER_AtDelay(3);
+		break;
+
+	case AT_QFOPEN:
+		strcpy(pDst, "AT+QFOPEN=\"FOTA_TEST.bin\",0\r\n"); 			//打开文件
+		TIMER_AtDelay(3);
+		break;
+
+	case AT_QFREAD:
+		strcpy(pDst, "AT+QFREAD=1,1024\r\n"); 				//读取文件指定长度
+		TIMER_AtDelay(3);
+		break;
+
+	case AT_QFCLOSE:
+		strcpy(pDst, "AT+QFCLOSE=1\r\n"); 					//关闭文件
+		TIMER_AtDelay(3);
+		break;
+
 	default:
 		break;
 	}
@@ -801,7 +836,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			}
 
 			//如果是休眠期间周期性唤醒时上传数据成功，ActiveTimer = 2即刻进入休眠
-			if((Flag.Insleeping) || (GprsSend.posCnt == 0))
+			if(((Flag.Insleeping) || (GprsSend.posCnt == 0)) && (!Flag.NoSleepMode))
 			{
 				ActiveTimer = 3;
 			}	
@@ -1224,14 +1259,92 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			}
 			Wifi_Content[i - 1] = 0;		//去掉末尾的','
 
-			Flag.GetScanWifi = 1;
-
+			if(WifiCnt > 0)
+			{
+				Flag.GetScanWifi = 1;
+			}
+			
 			back = 1;
 			AtDelayCnt = 0;
 			*temType = AT_NULL;
 		}
 	break;
 
+	case AT_QHTTPURL:
+		if(strstr(pSrc, "CONNECT") != NULL)
+		{
+			Flag.IsUpgrate = 1;
+			*temType = AT_HTTPURL;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+
+		break;
+
+	case AT_HTTPURL:
+		if(strstr(pSrc, "OK") != NULL)
+		{
+			*temType = AT_QHTTPGET;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+		break;
+
+	case AT_QHTTPGET:
+		if(strstr(pSrc, "+QHTTPGET: 0,200") != NULL)
+		{
+			*temType = AT_QHTTPREADFILE;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+		break;
+
+	case AT_QHTTPREADFILE:
+		if(strstr(pSrc, "+QHTTPREADFILE: 0") != NULL)
+		{
+			*temType = AT_QFOPEN;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+		break;
+
+	case AT_QFOPEN:
+		if(strstr(pSrc, "+QFOPEN: 1") != NULL)
+		{
+			*temType = AT_QFREAD;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+		break;
+
+	case AT_QFREAD:
+		if((strstr(pSrc, "CONNECT") != NULL)&&(UpgInfo.AppReadComplete == 0))
+		{
+			WIRELESS_UpgradeReceive(pSrc);
+		}
+		else if(UpgInfo.AppReadComplete)	//文件已经读取完成
+		{
+			*temType = AT_NULL;
+		}	
+		else								//文件读取出错		
+		{
+			*temType = AT_NULL;
+			UpgInfo.UpgrateFail = 1;
+		}
+		AtDelayCnt = 0;
+		back = 1;	
+		break;
+
+	case AT_QFCLOSE:
+		if(strstr(pSrc, "OK") != NULL)
+		{
+			*temType = AT_NULL;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+		break;
+
+	
 	default:
 		break;
 	}
@@ -1409,6 +1522,14 @@ void Flag_check(void)
 	{
 		Flag.NeedScanWifi = 0;
 		AtType = AT_QWIFISCAN;
+		return;
+	}
+
+	//网络激活状态，并且已经给服务器应答开始升级指令，可以开始升级
+	if((UpgInfo.NeedUpdata)&&(Flag.IsContextAct))
+	{
+		UpgInfo.NeedUpdata = 0;
+		AtType = AT_QHTTPURL;
 		return;
 	}
 }

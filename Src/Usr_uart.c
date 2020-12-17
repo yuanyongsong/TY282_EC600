@@ -210,6 +210,26 @@ void At_Receive(void)
 	{
 		WIRELESS_GprsReceive(Uart1Buf);
 	}
+
+	//http下载升级文件结果上报
+	if (strstr(Uart1Buf, "+QHTTPGET:"))
+	{
+		if(strstr(Uart1Buf, "+QHTTPGET: 0,200,") != NULL)
+		{
+			UpgInfo.AppDownloadOk = 1;			//数据接收成功，准备提取数据
+		}
+		else
+		{
+			Fs.FsUpg.UpgNeedSendGprs = 1;			//数据接收错误，需要返回错误内容
+			UpgInfo.UpgrateFail = 1;
+			strcpy(Fs.FsUpg.HttpError,"Network Error");
+			UpgInfo.RetryWaitCnt = 30;
+			if(UpgInfo.RetryCnt > 0)
+			{
+				printf("Network Error,retry after 30s...\r\n");
+			}		
+		}
+	}
 }
 
 void Gps_Data_Receive(void)

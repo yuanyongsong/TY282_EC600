@@ -1,7 +1,8 @@
 #include "usr_main.h"
 
 Rtc_st Rtc;
-Rtc_st RtcAgpsBackup; //AGPS获取时间备份
+Rtc_st Rtc_BJ;			//北京时间
+Rtc_st RtcAgpsBackup;   //AGPS获取时间备份
 
 unsigned char baseTimeCnt;
 unsigned char baseTimeSec;
@@ -11,7 +12,6 @@ unsigned int baseSecCnt;
 unsigned int Timestamp;		 //unix时间（时间戳）
 unsigned char ResetLeftCnt;  //该变量为重启设备倒计时。被赋值之后递减，为0时重启模块。需要延时重启时使用，例如更新Fs数据后需要重启
 unsigned int AtDelayCnt; 	 //AT指令发送成功后延时多久发送下一条指令，通常AT指令处理处理完成后会清零该位，取消等待
-unsigned int IntervalTemp;   //用来暂存定时上传时间间隔
 unsigned short WakeupCnt;	 //RTC中断次数，用于唤醒系统
 unsigned char WakeUpType;	//设备唤醒原因，1为需要上传心跳包唤醒，2为需要上传定位包唤醒，3为震动唤醒
 
@@ -132,6 +132,60 @@ void TIMER_RtcInit(void)
 	memset(&RtcAgpsBackup, 0, sizeof(RtcAgpsBackup));
 }
 
+//UTC转换为北京时间  
+void UTCToBeijing(Rtc_st RtcTemp)
+{
+	int year=0,month=0,day=0,hour=0;
+    int lastday = 0;			// 月的最后一天日期
+
+	
+	year =  RtcTemp.year;
+	month = RtcTemp.mon;
+	day =   RtcTemp.day;
+	hour =  RtcTemp.hour + 8;		//UTC+8转换为北京时间
+
+	if(month==1 || month==3 || month==5 || month==7 || month==8 || month==10 || month==12)
+	{
+		lastday = 31;
+	}
+	else if(month == 4 || month == 6 || month == 9 || month == 11)
+	{
+		lastday = 30;
+	}
+	else
+	{
+		if((year%400 == 0)||(year%4 == 0 && year%100 != 0))//闰年的2月为29天，平年为28天
+			lastday = 29;
+		else
+			lastday = 28;
+	}
+
+	if(hour >= 24)//当算出的时大于或等于24：00时，应减去24：00，日期加一天
+	{
+			hour -= 24;
+			day += 1; 
+			if(day > lastday)//当算出的日期大于该月最后一天时，应减去该月最后一天的日期，月份加上一个月
+			{ 
+					day -= lastday;
+					month += 1;
+
+					if(month > 12)//当算出的月份大于12，应减去12，年份加上1年
+					{
+							month -= 12;
+							year += 1;
+					}
+			}
+	}
+	
+
+	Rtc_BJ.year = (u16)(year);
+	Rtc_BJ.mon  = (u8)month;
+	Rtc_BJ.day  = (u8)day;
+	Rtc_BJ.hour = (u8)hour;
+	Rtc_BJ.min  = (u8)RtcTemp.min;
+	Rtc_BJ.sec  = (u8)RtcTemp.sec;
+
+}
 //比较保存的AGPS数据时间和当前时间，超过6小时，认为数据无效，返回1
 u8 CompareAgpsRct(Rtc_st RtcNow, Rtc_st RtcBackUp)
 {
@@ -222,7 +276,53 @@ void TIMER_SecCntHandle(void)
 			UpgInfo.NeedUpdata = 1;
 		}
 	}
+	
 
+	if((SysPoweKeyCnt == 4) && (KEY0 == 0))		//如果是第四次按下，长按3秒关机
+	{
+		SysPoweKeyTimer ++;
+		if(SysPoweKeyTimer >= 3)
+		{
+			SysPoweKeyTimer = 0;
+			Flag.NeedShutDown = 1;
+		}
+	}
+	else if((SysPoweKeyCnt == 4) && (KEY0 == 1) && !Flag.NeedShutDown)		//如果第四次按下没有满3秒
+	{
+		SysPoweKeyTimer = 0;
+		SysPoweKeyCnt = 0;
+	}
+
+	if((Flag.SysShutDown) && (KEY0 == 0))
+	{
+		SysPoweKeyTimer ++;
+		if(SysPoweKeyTimer >= 3)
+		{
+			SysPoweKeyTimer = 0;
+			Flag.NeedDeviceRst = 1;
+		}		
+	}
+	else if((Flag.ModuleSleep) && (KEY0 == 0))			//休眠模式下按下按键,长按3秒开机定位
+	{
+		SysPoweKeyTimer ++;
+		if(SysPoweKeyTimer >= 3)
+		{
+			SysPoweKeyTimer = 0;
+			Flag.ModuleWakeup = 1;
+			Flag.ModuleSleep = 0;
+			ActiveTimer = 120;
+			WakeUpType = 2;
+		}	
+	}
+	else if(KEY0 == 1)
+	{
+		SysPoweKeyTimer = 0;
+	}
+
+	if(baseSecCnt % 5 == 0)
+	{
+		Flag.NeedPrintf = 1;
+	}
 
 	if ((baseSecCnt % 10 == 4) && (baseSecCnt > 4))
 	{
@@ -316,6 +416,11 @@ void TIMER_SecCntHandle(void)
 	{
 		ModePwrDownCnt--;
 	}
+
+	if(WifiScanDelay > 0)
+	{
+		WifiScanDelay --;
+	}
 	
 	if (WaitUbloxCnt > 0) 
 	{
@@ -388,6 +493,11 @@ void TIMER_BaseCntHandle(void)
 	if (Uart4RecCnt > 0)
 	{
 		Uart4RecCnt--;
+	}
+
+	if(KeyShocksTimer > 0)
+	{
+		KeyShocksTimer --;
 	}
 
 	if (++ledCnt > 32)
@@ -637,6 +747,45 @@ void RTC_Wake_Init(u16 sec)
 
 }
  
+void RTC_Close(void)
+{
+	/* 设置RTC时钟源 */
+	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
+	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_RTC);
+	LL_PWR_EnableBkUpAccess();									//使能对后备寄存器的访问
+	/* 使能RTC时钟 */
+	LL_RCC_LSI_Enable();
+	//等待LSI稳定
+	while(LL_RCC_LSI_IsReady() != 1)
+	{
+	}
+	//选择LSI为RTC外设时钟
+	LL_RCC_SetRTCClockSource(LL_RCC_RTC_CLKSOURCE_LSI);
+	LL_RCC_EnableRTC();
+	/* 设置预分频 */
+	LL_RTC_SetAsynchPrescaler(RTC, 0x7F);
+	LL_RTC_SetSynchPrescaler(RTC, 0xFF);
+
+	/* 失能RTC写保护 */
+	LL_RTC_DisableWriteProtection(RTC);
+	/* 修改重装载值时需要先禁止唤醒定时器 */
+	LL_RTC_WAKEUP_Disable(RTC);
+	
+	/* 等待WUTWF置1 */
+	while (LL_RTC_IsActiveFlag_WUTW(RTC) != 1)
+	{
+	}
+	NVIC_DisableIRQ(RTC_TAMP_IRQn);
+	/* 清除唤醒标志 */
+	LL_RTC_ClearFlag_WUT(RTC);   
+	//关闭wakeup和中断
+	LL_RTC_DisableIT_WUT(RTC);
+	LL_RTC_WAKEUP_Disable(RTC);  
+	/* 使能写保护 */
+	LL_RTC_EnableWriteProtection(RTC);
+
+}
+
 
 void RTC_TAMP_IRQHandler(void)
 {
@@ -658,12 +807,29 @@ void RTC_TAMP_IRQHandler(void)
 		//如果开启了自动开关机功能，如果在关机时间段内，系统只会周期性唤醒，更新时间戳，不会执行其他操作
 		if((Fs.ModeSet & AUTO_SHUTDOWN) && (Timestamp > 0x50000000))		//确认时间戳已经有效
 		{
+			u8 BootHour_temp = 0;
+
 			GetTimeFormTimeTamp(Timestamp);
 
+			BootHour_temp = NowHour;
+
+			//在进入到如果设置的开机时间到第二天，这里需要将当前时间+24后再计算
+			if(Fs.BootHour > 24) 	
+			{
+				BootHour_temp += 24;
+			}
+
 			if((((NowHour > Fs.ShutDownHour) || ((NowHour == Fs.ShutDownHour) && (NowMin >= Fs.ShutDownMin)))\
-			&& (((NowHour < Fs.BootHour) ||((NowHour == Fs.BootHour) && (NowMin <= Fs.BootMin))))))
+			&& (((BootHour_temp < Fs.BootHour) ||((BootHour_temp == Fs.BootHour) && (NowMin <= Fs.BootMin))))))
 			{
 				Flag.InNoShockSleep = 1;
+
+				//如果设备因为上传时间间隔很短而不休眠的情况，这里需要先关闭，退出时再开启
+				if(Flag.NoSleepMode)
+				{
+					Flag.NoSleepMode = 0;
+				}
+
 				//如果设备在休眠，需要唤醒一下，关闭Gsensor
 				if((Flag.ModuleSleep) && (!Flag.GsensorClose))			
 				{			
@@ -678,12 +844,19 @@ void RTC_TAMP_IRQHandler(void)
 				Flag.DeviceInDeepSleep = 0;		
 				Flag.InNoShockSleep = 0;
 				NoShockCnt = 0;
+
+				//退出时，如果不休眠条件。重新开启不进去休眠
+				if(Fs.Interval <=120)
+				{
+					Flag.NoSleepMode = 1;			
+				}
 			}
 		
 		}
 
 		if(Flag.InNoShockSleep)		return;			//如果是处于自动关机期间，不再周期性唤醒上传数据
-
+		if(Flag.NoSleepMode)		return;			//如果是非休眠模式下进入的低功耗，只有振动唤醒，RTC不应唤醒
+		
 		if ((Flag.ModuleSleep)&&!Flag.DeviceInDeepSleep)		//如果还有震动没有进入深度睡眠，周期性上传定位包和心跳包
         {
 			if(WakeupCnt % (Fs.Interval/60) == 0)

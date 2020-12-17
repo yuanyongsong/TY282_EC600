@@ -48,7 +48,11 @@ void Sys_Setting_Before_StopMode(void);
 void Exit_GPIO_Interrupt_Init(void);
 void StopMode_TurnOn_Some_GPIOs(void); 
 void GPIO_Init_Before_Shutdown(void);
+
 extern unsigned char KeyDefaultCnt;
 extern unsigned char KeyPwrActCnt;
 extern unsigned char ledCnt;
+extern unsigned char SysPoweKeyCnt;
+extern unsigned char SysPoweKeyTimer;
+extern unsigned char KeyShocksTimer;		
 #endif

@@ -10,7 +10,7 @@ unsigned short WaitAtTime;		//等待AT超时时间，默认是75，可以根据�
 unsigned char WatchDogCnt = 0; 
 unsigned char AtTimeOutCnt; 	//AT超时次数，超时三次重启模块
 unsigned char NeedModuleReset;
-unsigned short NoShockCnt;		//没有振动计时，用于处理地下停车场长期无网络时不循环重启模块问题及进入深度睡眠
+unsigned int  NoShockCnt;		//没有振动计时，用于处理地下停车场长期无网络时不循环重启模块问题及进入深度睡眠
 unsigned char ModePwrDownCnt;	//执行关机操作后等待模块回应关机消息倒计时
 unsigned char CheckModeCnt;		//模块开机后，等待主动上报内容，超过10秒，跳过等待，直接开始发送AT指令
 const unsigned char SoftwareBuilt[50] = {0};
@@ -116,8 +116,9 @@ void Usr_InitValue(void)
 	Flag.NeedReloadAgps = 1;
 	Flag.NeedGetMccMnc = 1;
 	AT_CBC_IntervalTemp = 20;
-	Flag.NeedScanWifi = 1;
-	
+//	Flag.NeedScanWifi = 1;
+	GprsSend.handFlag = 1;		//开机时需要先发送一个心跳包，在设备连接上平台时就可以发送一个数据
+
 	ActiveTimer = ACTIVE_TIME;
 
 	AtType = AT_NULL;
@@ -126,16 +127,15 @@ void Usr_InitValue(void)
 
 	FS_InitValue();						
 
-	memset(&FsUpg,0,sizeof(FsUpg));
+	memset(&Fs.FsUpg,0,sizeof(Fs.FsUpg));
   	//EXFLASH_ReadBuffer((u8 *)&FsUpg,FLASH_UPG_ADDR,sizeof(FsUpg));
 	//远程升级成功,需要发送升级成功数据
-	if(FsUpg.UpgEnJamp==0xAA)		
+	if(Fs.FsUpg.UpgEnJamp==0xAA)		
 	{
 		Flag.NeedSendUpgResult = 1;
 		//清除升级结果
-		memset(&FsUpg,0,sizeof(FsUpg));
-		EXFLASH_EraseSector(FLASH_UPG_ADDR);
-		//EXFLASH_WriteBuffer((u8 *)&FsUpg,FLASH_UPG_ADDR,sizeof(FsUpg));
+		memset(&Fs.FsUpg,0,sizeof(Fs.FsUpg));
+		Flag.NeedUpdateFs = 1;
 		printf("\r\nUpgrade App success!\r\n");
 	}
 
@@ -156,19 +156,14 @@ void Usr_InitValue(void)
 		Flag.NeedUpdateFs = 1;
 	}
 	
-	#if NO_SLEEP
-	IntervalTemp = 30;
-	#else
-	IntervalTemp = Fs.Interval;
-	#endif
 	//读取到的关键参数合法性判断
 	if(strlen(Fs.IpAdress) < 5)			
 	{
 		memset(Fs.IpAdress,0,sizeof(Fs.IpAdress));
 		memset(Fs.IpPort,0,sizeof(Fs.IpPort));
 
-		strcpy(Fs.IpAdress,"device2.iotpf.mb.softbank.jp");
-		strcpy(Fs.IpPort,"8883");
+		strcpy(Fs.IpAdress,"47.101.151.253");
+		strcpy(Fs.IpPort,"7788");
 
 		Flag.NeedUpdateFs = 1;
 	}
@@ -178,6 +173,7 @@ void Usr_InitValue(void)
 	strncpy(UserIDBuf,Fs.UserID, sizeof(UserIDBuf)); 
 
 	//以下是需要获取到配置参数才能初始化的设备外设
+//	Fs.Interval = 15;
 	if(Fs.Interval <=120)
 	{
 		Flag.NoSleepMode = 1;			//小于2分钟时，低功耗模式已经没有优势，不进入休眠
@@ -209,6 +205,26 @@ void Flag_Check(void)
 		BatVoltage_Adc = (u32)Adc_Value_Get();
 		BatVoltage_Adc = (u16)(BatVoltage_Adc * 478/100);		//转换成电池电压,1M和270k分压，采样值*（1.27/0.27）=采样值*4.7,修正到4.78
 		printf("\r\nThe battery voltage is %d mv\r\n",BatVoltage_Adc);
+	}
+
+	if(UpgInfo.NeedWaitUpgrade)
+	{
+		UpgInfo.HaveGetRankData = 0;
+		UpgInfo.NeedWaitUpgrade = 0;
+		UpgInfo.NeedUpdata = 1;				//需要开始升级
+		UpgInfo.RetryCnt = 2;				//升级失败重复次数
+
+		printf("Need upgrade the device,upgrade file name is: %s\r\n",Fs.FsUpg.AppFilePath);
+
+		// Flag.NeedResponseFrist = 1;			//需要首先应答平台消息后在开始升级
+		// Flag.NeedSendResponse = 1;
+		// sprintf(RespServiceBuf,"Fota file name is :%s,ready upgrade...",FsUpg.AppFilePath);
+	}
+	
+	if(Flag.NeedPrintf)
+	{
+		Flag.NeedPrintf = 0;
+		printf("ActiveTimer:%d\r\n",ActiveTimer);
 	}
 
 }
