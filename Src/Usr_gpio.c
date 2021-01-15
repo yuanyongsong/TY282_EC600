@@ -6,6 +6,9 @@ unsigned char ledCnt;
 unsigned char SysPoweKeyCnt;		//系统开关机按键按下计数
 unsigned char SysPoweKeyTimer;		//系统开关机按键按下计时
 unsigned char KeyShocksTimer;		//按键短按判断，判断条件是间隔时间小于1秒
+unsigned char ValidShocksCnt;       //有效震动次数，超过三次有效震动认为是连续震动
+unsigned char SignalShockKeepCnt;   //单次震动有效持续时间，在这个时间段中产生的震动，认为是一次震动
+unsigned char DevPerWakeUpCnt;      //设备预唤醒计时
 
 void GPIO_Hand(void)
 {
@@ -302,7 +305,7 @@ void Exit_GPIO_Interrupt_Init(void)
 void GPIO_Init_Before_Shutdown(void)
 {
     LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-    LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
+//    LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
 	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_ALL);
 
     //不关闭PA13和PA14
@@ -368,8 +371,12 @@ void StopMode_TurnOff_Some_GPIOs(void)
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    //二氧化碳传感器供电使能脚，PC4；模块供电维持，PC7；
+    //模块供电维持，PC7；如果是设备休眠时模块休眠模式，应保留该位状态
+#if MODULE_OFF_MODE
     GPIO_InitStruct.Pin = LL_GPIO_PIN_ALL;
+#else
+    GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_7));
+#endif
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
@@ -461,29 +468,39 @@ void EXTI2_3_IRQHandler(void)
         LL_EXTI_ClearFallingFlag_0_31(LL_EXTI_LINE_3);
         if(Flag.ModuleSleep)
         {
-            if(Flag.DeviceInDeepSleep)
+            Flag.RtcInterrupt = 1;
+            
+            if(WorkMode == 1)
             {
-                WakeUpType = 3;
-                Flag.DeviceInDeepSleep = 0; 
-                Flag.ModuleSleep = 0;
-                Flag.ModuleWakeup = 1;
-			    ActiveTimer = 120;
-                Flag.RtcInterrupt = 1;
+                if(SignalShockKeepCnt == 0)
+                {
+                    SignalShockKeepCnt = 10;
+                    ValidShocksCnt ++;
+                    
+                    if(!Flag.DevPreWakeUp)
+                    {
+                        Flag.DevPreWakeUp = 1;
+                        DevPerWakeUpCnt = 10;       //进入预唤醒模式
+                    }
+
+                    if(ValidShocksCnt >= 3)
+                    {
+                        WorkMode = 2;
+                        IdlingKeepTime = 0;
+                        Flag.OtherSendPosi = 1;         //工作模式变化，需要立刻上传数据
+                        ValidShocksCnt = 0;
+                        DevPerWakeUpCnt = 0;            //将预唤醒计时清零，立刻从预唤醒切换到唤醒模式
+                        Flag.DevPreWakeUp = 0;          //退出预唤醒，进入唤醒模式
+                        Flag.ModuleSleep = 0;
+                        Flag.ModuleWakeup = 1;
+                        ActiveTimer = 120;
+                        WakeUpType = 3;
+                    }
+                }
             }
         }
 
-        //如果是因为上传时间间隔短的不休眠模式，在持续无振动180秒后设备也需要进入休眠状态
-        if(Flag.NoSleepMode)
-        {
-            if(Flag.ModuleSleep)
-            {
-                WakeUpType = 3;
-                Flag.ModuleSleep = 0;
-                Flag.ModuleWakeup = 1;
-            }
 
-            ActiveTimer = 180;
-        }
         NoShockCnt = 0;
     }
 }

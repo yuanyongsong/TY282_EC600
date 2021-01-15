@@ -940,3 +940,10 @@ MDK-ARM/RTE/_w686_SIM7080G/RTE_Components.h
 MDK-ARM/EventRecorderStub.scvd
 MDK-ARM/JLinkLog.txt
 MDK-ARM/JLinkSettings.ini
+OutPut/usr_adc.crf
+OutPut/usr_adc.o
+OutPut/w609_EC600_w606_EC600.dep
+MDK-ARM/w606_EC600.uvguix.yuanyongsong.bak
+MDK-ARM/w609_EC600.uvguix.yuanyongsong
+MDK-ARM/w609_EC600.uvoptx
+MDK-ARM/w609_EC600.uvprojx

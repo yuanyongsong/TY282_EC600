@@ -54,5 +54,9 @@ extern unsigned char KeyPwrActCnt;
 extern unsigned char ledCnt;
 extern unsigned char SysPoweKeyCnt;
 extern unsigned char SysPoweKeyTimer;
-extern unsigned char KeyShocksTimer;		
+extern unsigned char KeyShocksTimer;	
+extern unsigned char ValidShocksCnt;       
+extern unsigned char SignalShockKeepCnt;	
+extern unsigned char DevPerWakeUpCnt;
+
 #endif

@@ -16,34 +16,44 @@ void BcdStr2HexStr(char *pSrc, char *pDst)
 void Usr_ModuleGoSleep(void)
 {
 
-	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup) 
+#if DEEP_SLEEP_MODE
+	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup) 	//使用深度休眠
+#else
+	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup || Flag.NoSleepMode) 	//不使用深度休眠
+#endif
 	{
 		return;
 	}
 
 	Flag.ModuleWakeup = 0;
 	Flag.ModuleSleep = 1;
-	Flag.NeedModuleOff = 1;
 	Flag.IsGpsOn = 0;
 
 	GREEN_OFF;
 	RED_OFF;
 
-	if(Flag.ModuleOn)
+	if(WorkMode == 1)
 	{
-		Usr_ModuleTurnOff();
+		Flag.NeedModuleOff = 1;
+		if(Flag.ModuleOn)
+		{
+			Usr_ModuleTurnOff();
+		}
+		POWER_OFF;
 	}
-
-	if(Flag.InNoShockSleep)
+	else
 	{
-		G_Sensor_Pwr(0);
-		Flag.GsensorClose = 1;
-		printf("Auto shut down!\r\n");
+		MODULE_WAKEUP_SET;				//拉高DTR，让设备模块进入睡眠模式
 	}
+	
 
-	if(NoShockCnt > 300)
+	if(WorkMode == 1)
 	{
+	#if DEEP_SLEEP_MODE
 		printf("\r\nsystem go to deep sleep!\r\n");
+	#else
+		printf("\r\nsystem go to deep sleep!\r\n");
+	#endif
 	}
 	else
 	{
@@ -51,14 +61,14 @@ void Usr_ModuleGoSleep(void)
 	}
 	
 	LL_mDelay(100);		//留一个时间窗口给串口打印数据
-	POWER_OFF;
 	GPS_OFF;
+	Flag.HaveGPS = 0;
 //	Close_ADC();
 
 	Sys_Setting_Before_StopMode();
 
 	Flag.Insleeping = 1;						//在要进入休眠时再置位该标志
-
+	ValidShocksCnt = 0;
 sleep:
 	#if 1
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
@@ -86,19 +96,20 @@ sleep:
 		delay_ms(10);		
 	}
 
-	if(!Flag.ModuleWakeup)			//如果按键按下没超过三秒
+	while(DevPerWakeUpCnt > 0)
+	{
+		delay_ms(10);
+	}
+
+	if(!Flag.ModuleWakeup)								//如果没有成功唤醒
 	{
 		SysPoweKeyTimer = 0;
+		ValidShocksCnt = 0;				//清除有效触发次数
+		Flag.DevPreWakeUp = 0;			//清除预唤醒状态，让系统重新回到休眠模式
 		goto sleep;
 	}
 	
 	Usr_InitHardware();
-	if(Flag.GsensorClose)
-	{
-		G_Sensor_Pwr(1);
-		Flag.GsensorClose = 0;
-	}
-	
 
 }
 
@@ -123,17 +134,16 @@ void Usr_ModuleWakeUp(void)
 		GprsSend.posFlag = 1;
 		NoGpsRestartCnt = 0;			//唤醒的时候需要清0未搜索到gps计数
 		Flag.NeedGpsOpen = 1;
-		Flag.NeedModuleOn = 1;
 		WifiScanDelay = 0;				//清除wifi扫描等待
+		if(Flag.ModuleOn == 0)
+		{
+			Flag.NeedModuleOn = 1;
+		}
+		else
+		{
+			MODULE_WAKEUP_RESET;
+		}
 		printf("\r\n Need send Location data\r\n");
-	}
-	else if(WakeUpType == 1)
-	{
-		WakeUpType = 0;
-		GprsSend.handFlag = 1;
-		Flag.NeedGpsOpen = 0;
-		Flag.NeedModuleOn = 1;
-		printf("\r\n Need send Hand data\r\n");
 	}
 
 	LL_mDelay(200);

@@ -106,7 +106,47 @@ void UART_Gps_Init(void)
 
 void Debug_Receive(void)
 {
+	char *p0 = NULL;
+	char *p1 = NULL;
 
+	if (strstr(Uart3Buf, "Go to Setting mode"))
+	{
+		Fs.ModeSet |= SETTING_MODE;
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+		delay_ms(10);
+		printf("Enter Setting Mode...\r\n");
+		NVIC_SystemReset();
+	}
+	else if(strstr(Uart3Buf, "ChangeID="))
+	{
+		p0 = strstr(Uart3Buf, "ChangeID=");
+		p1 = strstr(Uart3Buf, "\r\n");
+		p0 += 9;
+
+		if(p1 - p0 == 11)
+		{
+			memset(Fs.UserID, 0, sizeof(Fs.UserID));
+			strncpy(Fs.UserID, p0, p1 - p0);
+			Flag.NeedUpdateFs = 1;
+			FS_UpdateValue();
+			printf("Device ID:%s\r\n",Fs.UserID);
+		}
+		else
+		{
+			printf("Device ID setting error!\r\n");
+		}		
+	}
+	else if(strstr(Uart3Buf, "Setting Over"))
+	{
+		Fs.ModeSet &= ~SETTING_MODE;
+		Flag.DeviceInSetting = 0;
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+		printf("Device Setting Over,Ready restart device...\r\n");
+		delay_ms(10);
+		NVIC_SystemReset();
+	}
 }
 
 void UART_DebugInit(void)

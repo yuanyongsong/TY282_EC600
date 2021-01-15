@@ -265,7 +265,27 @@ void TIMER_SecCntHandle(void)
 
 	baseSecCnt ++;
 
+	NoShockCnt ++;
+	if(NoShockCnt >= 240)
+	{
+		if(WorkMode != 1)
+		{
+			Flag.OtherSendPosi = 1;         //工作模式变化，需要立刻上传数据
+		}
+		WorkMode = 1;	
+	}
 
+	//如果怠速超过5分钟，切换到工作模式
+	if(WorkMode == 2)
+	{
+		IdlingKeepTime ++;
+		if(IdlingKeepTime > 300)
+		{
+			IdlingKeepTime = 0;
+			WorkMode = 3;
+			Flag.OtherSendPosi = 1;
+		}
+	}
 
 	if((UpgInfo.RetryWaitCnt > 0) && (UpgInfo.RetryCnt > 0))
 	{
@@ -324,10 +344,14 @@ void TIMER_SecCntHandle(void)
 		Flag.NeedPrintf = 1;
 	}
 
+	if((baseSecCnt % 30 == 0) && !Flag.GsensorInitOk)
+	{
+		Flag.GsensorNeedInit = 1;
+	}
+
 	if ((baseSecCnt % 10 == 4) && (baseSecCnt > 4))
 	{
 		Flag.CsqChk = 1;		 //查信号强度
-		Flag.Bma250NeedInit = 1; //查振动传感器状态
 	}
 	
 	//如果设备没有附着上网络，10秒检测一次CGREG
@@ -422,6 +446,11 @@ void TIMER_SecCntHandle(void)
 		WifiScanDelay --;
 	}
 	
+	if(DevPerWakeUpCnt > 0)
+	{
+		DevPerWakeUpCnt --;
+	}
+
 	if (WaitUbloxCnt > 0) 
 	{
 		WaitUbloxCnt--;
@@ -500,6 +529,11 @@ void TIMER_BaseCntHandle(void)
 		KeyShocksTimer --;
 	}
 
+	if(SignalShockKeepCnt > 0)
+	{
+		SignalShockKeepCnt --;
+	}
+
 	if (++ledCnt > 32)
 		ledCnt = 0; //周期为4s
 
@@ -519,7 +553,11 @@ void TIMER_BaseCntHandle(void)
 	{
 		RED_ON;
 	}
-
+	else if(Flag.DeviceInSetting)
+	{
+		RED_ON; 
+		GREEN_ON;		
+	}
 	else
 	{
 		switch (ledCnt)
@@ -797,95 +835,49 @@ void RTC_TAMP_IRQHandler(void)
 
 		WakeupCnt ++;
 		Timestamp += 60;
-		NoShockCnt += 60;
 
 		if (Flag.ModuleSleep)
 		{
 			Flag.RtcInterrupt = 1;
 		}
 
-		//如果开启了自动开关机功能，如果在关机时间段内，系统只会周期性唤醒，更新时间戳，不会执行其他操作
-		if((Fs.ModeSet & AUTO_SHUTDOWN) && (Timestamp > 0x50000000))		//确认时间戳已经有效
-		{
-			u8 BootHour_temp = 0;
-
-			GetTimeFormTimeTamp(Timestamp);
-
-			BootHour_temp = NowHour;
-
-			//在进入到如果设置的开机时间到第二天，这里需要将当前时间+24后再计算
-			if(Fs.BootHour > 24) 	
-			{
-				BootHour_temp += 24;
-			}
-
-			if((((NowHour > Fs.ShutDownHour) || ((NowHour == Fs.ShutDownHour) && (NowMin >= Fs.ShutDownMin)))\
-			&& (((BootHour_temp < Fs.BootHour) ||((BootHour_temp == Fs.BootHour) && (NowMin <= Fs.BootMin))))))
-			{
-				Flag.InNoShockSleep = 1;
-
-				//如果设备因为上传时间间隔很短而不休眠的情况，这里需要先关闭，退出时再开启
-				if(Flag.NoSleepMode)
-				{
-					Flag.NoSleepMode = 0;
-				}
-
-				//如果设备在休眠，需要唤醒一下，关闭Gsensor
-				if((Flag.ModuleSleep) && (!Flag.GsensorClose))			
-				{			
-					Flag.ModuleSleep = 0;
-					Flag.ModuleWakeup = 1;
-					WakeUpType = 0;				//设置唤醒类型为0，唤醒后不会开启模块
-				}		
-			}
-			else if(Flag.InNoShockSleep)
-			{
-				//从关机模式下退出来的时候，深度休眠标志位通常已经置位，需要清除一下
-				Flag.DeviceInDeepSleep = 0;		
-				Flag.InNoShockSleep = 0;
-				NoShockCnt = 0;
-
-				//退出时，如果不休眠条件。重新开启不进去休眠
-				if(Fs.Interval <=120)
-				{
-					Flag.NoSleepMode = 1;			
-				}
-			}
-		
-		}
-
 		if(Flag.InNoShockSleep)		return;			//如果是处于自动关机期间，不再周期性唤醒上传数据
 		if(Flag.NoSleepMode)		return;			//如果是非休眠模式下进入的低功耗，只有振动唤醒，RTC不应唤醒
 		
-		if ((Flag.ModuleSleep)&&!Flag.DeviceInDeepSleep)		//如果还有震动没有进入深度睡眠，周期性上传定位包和心跳包
+		if ((Flag.ModuleSleep) && (WorkMode != 1))		//如果还有震动没有进入静止模式，周期性上传定位包
         {
-			if(WakeupCnt % (Fs.Interval/60) == 0)
+			if(WakeupCnt % 5 == 0)					//5分钟上传一次定位
 			{
 				WakeUpType = 2;
 				
 				Flag.ModuleSleep = 0;
 				Flag.ModuleWakeup = 1;
 				Flag.IrNoNeedWakeUp = 0;
-				ActiveTimer = 100;
-			}
-			else if(WakeupCnt % 5 == 0)
-			{
-				WakeUpType = 1;
-
-				Flag.ModuleSleep = 0;
-				Flag.ModuleWakeup = 1;
-				Flag.IrNoNeedWakeUp = 0;
-				ActiveTimer = 100;
+				ActiveTimer = 180;
 			}
 
         } 
+		else if((Flag.ModuleSleep) && (WorkMode == 1))
+		{
+			if(WakeupCnt % 60 == 0)					//如果是静止状态，60分钟上传一次数据
+			{
+				WakeUpType = 2;
+				
+				Flag.ModuleSleep = 0;
+				Flag.ModuleWakeup = 1;
+				Flag.IrNoNeedWakeUp = 0;
+				ActiveTimer = 180;
+			}			
+		}
 
 		//休眠期间
 		if(Flag.ModuleSleep)
 		{
-			if(NoShockCnt >= 300)
+			NoShockCnt += 60;
+
+			if(WorkMode == 2)
 			{
-				Flag.DeviceInDeepSleep = 1;
+				IdlingKeepTime += 60;
 			}
 		}
 

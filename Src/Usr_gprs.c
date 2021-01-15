@@ -280,19 +280,10 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 {
 	u16 data_len = 0;				//打包完成后整包数据长度
 	u16 content_len = 0;			//数据包中内容长度
-	u16 Degrees = 0;
-	u8  Elevation = 0;
 
 	char latTmp[14] = {0};
 	char lonTmp[14] = {0};
 	u8 bat_percente = 0;
-	u8 csq_temp = 0;
-
-
-	unsigned char gpsValid = 'A';
-
-	LBS_Num = 1;
-
 
 	memset(GprsSendBuf, '\0', DATABUFLEN);
 	memset(GprsContent, '\0', GPRSCONTLEN);
@@ -308,27 +299,6 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 	else
 		bat_percente = BatVoltage_Adc / 6;
 
-	if (Flag.HaveGPS)
-	{
-		gpsValid = 'A';
-	}
-	else
-	{
-		gpsValid = 'V';
-	}
-
-	if((Rssi > 30)&&(Rssi != 99))
-	{
-		csq_temp = 100;
-	}
-	else if((Rssi <= 30) && (Rssi >= 1))
-	{
-		csq_temp = (u8)((float)Rssi * 3.3);
-	}
-	else
-	{
-		csq_temp = 0;
-	}
 
 	PacketSerialNum ++;
 
@@ -357,10 +327,6 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 	latTmp[9] = 0;
 	lonTmp[10] = 0;
 
-	Degrees=(u16)atoi(DegreesTmp);
-	Elevation = (u16)CurElevation;
-
-	UTCToBeijing(Rtc);
 
 	switch (switch_tmp)
 	{
@@ -369,37 +335,18 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 		break;
 
 	case DATA:
-		if(Flag.HaveGPS)
-		{
-			sprintf(GprsContent, "LOCA:G;CELL:1,%s,%s,%s,%s,%d;GDATA:%c,%d,%02d%02d%02d%02d%02d%02d,%s,%s,%d,%d,%d;ALERT:0000;STATUS:%d,%d",
-					Mcc,Mnc,Lac,Cid,csq_temp,gpsValid,CurSateCnt,Rtc_BJ.year,Rtc_BJ.mon,Rtc_BJ.day, 
-					Rtc_BJ.hour,Rtc_BJ.min,Rtc_BJ.sec,latTmp,lonTmp,speedByte,Degrees,Elevation,bat_percente,csq_temp);
-		}
-		else if(Flag.GetScanWifi)
-		{
-			Flag.GetScanWifi = 0;
-			
-			sprintf(GprsContent, "LOCA:W;WIFI:%d,%s;ALERT:0000;STATUS:%d,%d;WAY:0",
-					WifiCnt,Wifi_Content,bat_percente,csq_temp);			
-		}
-
+		sprintf(GprsContent, "{\"dev\":\"%s\",\"stat\":%d,\"lat\":%s,\"lon\":%s}",
+				UserIDBuf,WorkMode,latTmp,lonTmp);
 		break;
-
-	case UPGRESULT:
-
-		break;
-
-	case HAND:
-		sprintf(GprsContent, "SYNC:%04X;STATUS:%d,%d",GprsSend.handsendcnt,bat_percente,csq_temp);
-		break;
-
+		
 	default:
 		break;
 	}
 	if(switch_tmp != AGPSDATA)
 	{
 		content_len = strlen(GprsContent);
-		sprintf(GprsSendBuf, "S168#%s#%04X#%04X#%s$",IMEI,PacketSerialNum,content_len,GprsContent);
+		sprintf(GprsSendBuf, "POST /gas/e/report HTTP/1.1\r\nHost: www.zzhb.org.cn\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s\r\n\r\n",
+		content_len,GprsContent);
 	}
 
 	data_len = strlen(GprsSendBuf);
@@ -419,66 +366,32 @@ void GPRS_Send_Handle(void)
 	}
 
 	
-	if (((GprsSend.posCnt > 0) || (Flag.NoSleepMode)) && (GprsSend.posFlag))
+	if (((GprsSend.posCnt > 0) && GprsSend.posFlag) || Flag.OtherSendPosi)
 	{
-		//GPS定位到了立即使用GPS上传位置信息，如果一直没有定位到，在休眠前10秒上传wifi信息
+		//GPS定位到了立即使用GPS上传位置信息，如果一直没有定位到，在休眠前10秒使用旧的定位上传位置信息
 		if(Flag.HaveGPS)
 		{
-			AtType = AT_QISEND;
+			AtType = AT_QHTTPPOST;
 			GprsType = DATA;	
 			GprsSend.posCnt = 0;
 			GprsSend.posFlag = 0;	
-			return;
 		}
-		else if(!Flag.HaveGPS && Flag.GetScanWifi)
+		else if(!Flag.HaveGPS && ActiveTimer <= 10)
 		{
-			AtType = AT_QISEND;
+			AtType = AT_QHTTPPOST;
 			GprsType = DATA;	
 			GprsSend.posCnt = 0;
 			GprsSend.posFlag = 0;	
-			return;
 		}
-		else if(!Flag.HaveGPS && !Flag.GetScanWifi && (WifiScanDelay == 0))
+		else if(Flag.OtherSendPosi)
 		{
-			if(Flag.NoSleepMode)				//如果是不休眠模式，到上传时间没有GPS的情况下，上传wifi
-			{
-				Flag.NeedScanWifi = 1;
-				WifiScanDelay = 10;
-			}
-			else if(ActiveTimer <= 10)			//在休眠模式下，在没有GPS的情况下，在进入休眠前20秒查询wifi
-			{
-				Flag.NeedScanWifi = 1;
-				WifiScanDelay = 10;
-			}
-			
+			AtType = AT_QHTTPPOST;
+			GprsType = DATA;		
 		}
+
+		Flag.OtherSendPosi = 0;
 	}
 
-
-	if(GprsSend.handFlag)
-	{
-		AtType = AT_QISEND;
-		GprsType = HAND;
-		GprsSend.handFlag = 0;
-		GprsSend.handsendcnt ++;
-		return;		
-	}
-/*
-	if (EXFLASH_ReadBreakPoint())
-	{
-		AtType = AT_QISEND;
-		GprsType = BKDATA;
-		Flag.IsSendingBk = 1;
-		return;
-	}
-*/
-	if(Flag.NeedSendUpgResult)
-	{
-		AtType = AT_QISEND;
-		GprsType = UPGRESULT;
-		Flag.NeedSendUpgResult = 0;	
-		return;	
-	}
 }
 
 #
@@ -564,113 +477,7 @@ void Itoa(unsigned char src, char dst[])
 
 void WIRELESS_GprsReceive(char *pSrc)
 {
-	char *p0 = NULL;
-	char *p1 = NULL;
-	char gprs_content[100] = {0};
 
-	p0 = strstr(pSrc,"S168");
-	p1 = strstr(p0,"$");
-	if(p0 != NULL)
-	{
-		if(p1 != NULL)
-		{
-			strncpy(gprs_content, p0, p1 - p0 + 1);
-			printf("\r\nRecvice the data form service: %s\r\n",gprs_content);
-
-		}
-		else
-		{
-			printf("\r\nRecvice data format incorrect!\r\n");
-			return;
-		}
-		//修改传感器灵敏度
-		if((p0 = strstr(pSrc,"GSENSOR,")) != NULL)
-		{
-			p0 += 8;
-			if(*p0 == '0')
-			{
-				G_Sensor_Pwr(0);
-				Fs.ModeSet |= NO_SENSOR;
-			} 	
-			else
-			{
-				if(*p0 == '1') 			Fs.Sensor = SENSOR_HIGH;
-				else if(*p0 == '2') 	Fs.Sensor = SENSOR_NORMAL;
-				else if(*p0 == '3') 	Fs.Sensor = SENSOR_LOW;
-
-				G_Sensor_init();
-			}	
-			Flag.NeedUpdateFs = 1;		
-		}
-		//修改上传时间间隔
-		else if((p0 = strstr(pSrc,"UP,")) != NULL)
-		{
-			p0 += 3;
-			Fs.Interval = (u32)atoi(p0);
-			if(Fs.Interval < 5)
-			{
-				Fs.Interval = 5;
-			}
-			if(Fs.Interval <=120)
-			{
-				Flag.NoSleepMode = 1;			
-			}
-			
-			Flag.NeedUpdateFs = 1;				
-		}
-		//重启
-		else if((p0 = strstr(pSrc,"REBOOT")) != NULL)
-		{
-			ResetLeftCnt = 3;			
-		}
-		//关机
-		else if((p0 = strstr(pSrc,"POWERDN")) != NULL)
-		{
-			Flag.NeedShutDown = 1;
-		}
-		//自动开关机
-		else if((p0 = strstr(pSrc,"APOF,")) != NULL)
-		{
-			p0 += 5;
-
-			if(*p0 == '0')			Fs.ModeSet &= ~AUTO_SHUTDOWN;
-			else if(*p0 == '1')		Fs.ModeSet |= AUTO_SHUTDOWN;
-			else 					return;
-
-			p0 = strstr(p0,",");
-			p0 ++;
-
-			Fs.ShutDownHour = (u8)atoi(p0);
-
-			p0 = strstr(p0,",");
-			p0 ++;
-
-			Fs.ShutDownMin = (u8)atoi(p0);
-
-			p0 = strstr(p0,",");
-			p0 ++;
-
-			Fs.BootHour = (u8)atoi(p0);
-
-			if(Fs.BootHour < Fs.ShutDownHour)			//如果时间跨天了，开机时间加24
-			{
-				Fs.BootHour += 24;
-			}
-
-			p0 = strstr(p0,",");
-			p0 ++;
-
-			Fs.BootMin = (u8)atoi(p0);
-
-			Flag.NeedUpdateFs = 1;
-		}
-		//恢复出厂设置
-		else if((p0 = strstr(pSrc,"FACTORY")) != NULL)
-		{
-			Flag.NeedClrValueFile = 1;
-			ResetLeftCnt = 3;	
-		}
-	}
 }
 
 void WIRELESS_Handle(void)

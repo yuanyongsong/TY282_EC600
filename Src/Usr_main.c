@@ -13,6 +13,8 @@ unsigned char NeedModuleReset;
 unsigned int  NoShockCnt;		//没有振动计时，用于处理地下停车场长期无网络时不循环重启模块问题及进入深度睡眠
 unsigned char ModePwrDownCnt;	//执行关机操作后等待模块回应关机消息倒计时
 unsigned char CheckModeCnt;		//模块开机后，等待主动上报内容，超过10秒，跳过等待，直接开始发送AT指令
+unsigned char WorkMode;			//挖掘机工作模式：1为静止模式，2为怠速模式，3为工作模式
+unsigned short IdlingKeepTime;	//怠速持续时间，超过5分钟认为是进入工作状态
 const unsigned char SoftwareBuilt[50] = {0};
 char Edition[50] = {0};
 
@@ -50,8 +52,8 @@ int main(void)
 	time_convert();
 	Usr_InitHardware();
 	printf("\r\n============================================");
-	printf("\r\n================w282_EC600S=================");
-	sprintf(Edition, "w282_EC600S_%s%s%s%s%s", Built_year, Built_mon, Built_day, Built_hour, Built_min);
+	printf("\r\n================w609_EC600S=================");
+	sprintf(Edition, "w609_EC600S_%s%s%s%s%s", Built_year, Built_mon, Built_day, Built_hour, Built_min);
 	printf("\r\n==software built time:%s %s==", __DATE__, __TIME__);
 	printf("\r\n============================================\r\n");
 	Usr_InitValue();
@@ -60,9 +62,7 @@ int main(void)
 		Usr_DeviceContral();
 		UART_Handle();
 		WIRELESS_Handle();
-		GPIO_Hand();
 		GPS_Handle();
-		GPRS_SaveBreakPoint();
 		FS_UpdateValue();
 		Flag_Check();
 		WatchDogCnt = 0;
@@ -104,7 +104,6 @@ void Usr_InitValue(void)
 	Flag.NeedGpsOpen = 1;
 	Flag.NeedSendToSleep = 1;
 	Flag.NeedModuleOn = 1;
-	Flag.Bma250NeedInit = 1;
 	Flag.NeedcheckLBS = 1;
 	Flag.PorOldOn = 1; 		//电池供电没有接外部供电时，不产生断电报警，只有在接过供电再断电时才产生断电报警
 	Flag.WakeUpMode = 1;
@@ -120,12 +119,35 @@ void Usr_InitValue(void)
 	GprsSend.handFlag = 1;		//开机时需要先发送一个心跳包，在设备连接上平台时就可以发送一个数据
 
 	ActiveTimer = ACTIVE_TIME;
-
+	WorkMode = 2;				//设备开机认为是在怠速状态
 	AtType = AT_NULL;
 	Flag.WaitAtAck = 0;
 	WatchDogCnt = 0;
 
-	FS_InitValue();						
+	FS_InitValue();			
+
+	//如果设备ID没有初始化，这里自动串口参数设置模式，等待通过串口初始化
+	if(memcmp(Fs.UserID,"00000000000",11) == 0)		
+	{
+		Flag.DeviceInSetting = 1;
+		printf("Device ID not set,please set device ID frist!\r\n");
+	}	
+
+	if(Fs.ModeSet & SETTING_MODE)
+	{
+		Flag.DeviceInSetting = 1;
+	}
+
+	while(Flag.DeviceInSetting)
+	{
+		if (Flag.Uart3HaveData && !Uart3RecCnt)
+		{
+			Debug_Receive();
+			UART_DebugInit();
+		}
+		WatchDogCnt = 0;
+		delay_ms(10);
+	}
 
 	memset(&Fs.FsUpg,0,sizeof(Fs.FsUpg));
   	//EXFLASH_ReadBuffer((u8 *)&FsUpg,FLASH_UPG_ADDR,sizeof(FsUpg));
@@ -150,43 +172,23 @@ void Usr_InitValue(void)
 		Fs.Sensor = 0x4;
 	}
 
-	if (Fs.Interval == 0 || Fs.Interval == 0xffffffff)
-	{
-		Fs.Interval = 3600;
-		Flag.NeedUpdateFs = 1;
-	}
-	
-	//读取到的关键参数合法性判断
-	if(strlen(Fs.IpAdress) < 5)			
-	{
-		memset(Fs.IpAdress,0,sizeof(Fs.IpAdress));
-		memset(Fs.IpPort,0,sizeof(Fs.IpPort));
-
-		strcpy(Fs.IpAdress,"47.101.151.253");
-		strcpy(Fs.IpPort,"7788");
-
-		Flag.NeedUpdateFs = 1;
-	}
-
-
 	memset(UserIDBuf,0, sizeof(UserIDBuf));
 	strncpy(UserIDBuf,Fs.UserID, sizeof(UserIDBuf)); 
 
 	//以下是需要获取到配置参数才能初始化的设备外设
-//	Fs.Interval = 15;
-	if(Fs.Interval <=120)
+
+	RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
+
+	if(G_Sensor_init())
 	{
-		Flag.NoSleepMode = 1;			//小于2分钟时，低功耗模式已经没有优势，不进入休眠
+		Flag.GsensorInitOk = 1;
+		printf("G sensor init ok\r\n");
 	}
 	else
 	{
-		RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
+		printf("G sensor init failed\r\n");
 	}
 	
-	if(G_Sensor_init())
-	{
-		printf("G sensor init ok\r\n");
-	}
 }
 
 void Flag_Check(void)
@@ -225,6 +227,20 @@ void Flag_Check(void)
 	{
 		Flag.NeedPrintf = 0;
 		printf("ActiveTimer:%d\r\n",ActiveTimer);
+	}
+
+	if(Flag.GsensorNeedInit)
+	{
+		Flag.GsensorNeedInit = 0;
+		if(G_Sensor_init())
+		{
+			Flag.GsensorInitOk = 1;
+			printf("G sensor init ok\r\n");
+		}
+		else
+		{
+			printf("G sensor init failed\r\n");
+		}
 	}
 
 }

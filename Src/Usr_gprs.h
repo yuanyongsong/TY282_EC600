@@ -28,9 +28,14 @@ typedef enum{
 #define SPEED_GPS		0
 
 
+#define	MODULE_OFF_MODE		0			//设备休眠期间：1，模块进入关机模式,；0模块进入休眠模式
+#define DEEP_SLEEP_MODE		0			//深度休眠模式，在振动停止一段时间后，设备不在周期性唤醒上传数据
+
 //#define IMEI_MANUAL	"861118010103569"
-#define IMEI_MANUAL	"000000000000002"
+//#define IMEI_MANUAL	"358511159000052"
+#define IMEI_MANUAL	"000000000000004"
 //#define IMEI_MANUAL	""
+#define PLAT_TYPE	1		//平台类型，1是益文的，2是宝康源
 
 
 #ifndef _GPRS_SEND
