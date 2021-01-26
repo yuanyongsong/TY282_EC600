@@ -2,7 +2,7 @@
 #define USR_GPS_H
 
 
-#define GPS_VALID_CNT  2
+#define GPS_VALID_CNT  5
 #define TIME_GPS_MAX   120
 
 #ifndef _MOVE_DATA

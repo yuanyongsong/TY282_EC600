@@ -90,8 +90,13 @@ static void FS_FactroyValue(void)
 	memset(Fs.UbloxIp, '\0', 21);
 	memset(Fs.UbloxPort, '\0', 7);
 
+#if (PLAT_TYPE == 1)
+	strcpy(Fs.IpPort, "7788");
+	strcpy(Fs.IpAdress, "bky.appxmg.com");
+#elif (PLAT_TYPE == 2)
 	strcpy(Fs.IpPort, "6800");
 	strcpy(Fs.IpAdress, "www.appxmg.com");
+#endif  
 	strcpy(Fs.ApnName, "em");
 	strcpy(Fs.GprsUserName, "");
 	strcpy(Fs.GprsPassWord, "");
@@ -103,7 +108,8 @@ static void FS_FactroyValue(void)
 	Fs.BkSendLen = 0;
 	Fs.Interval = 300;
 	Fs.HaveSetApn = 0;
-	Fs.Sensor = 0x10;
+	Fs.Sensor = SENSOR_HIGH;
+	Fs.GsensorType = 3;
 	Fs.ModeSet = 0;
 	Fs.ShutDownHour = 0xFF;
 	Fs.ShutDownMin = 0xFF;
@@ -146,10 +152,9 @@ void FS_InitValue(void)
 	//	EXFLASH_ReadArray(FLASH_UPG_ADDR, (char *)&FsUpg, sizeof(FsUpg));
 
 	//flash空白 要初始化
-		if ('O' != Fs.Ok[0] || 'K' != Fs.Ok[1])
-	//if (strcmp(Fs.IpAdress, "bky.appxmg.com") != 0)
+	if ('O' != Fs.Ok[0] || 'K' != Fs.Ok[1])
 	{
-		strcpy(Fs.UserID, "999999000004"); //这个变量在w686中暂时不使用
+		strcpy(Fs.UserID, "000000000000000"); //这个变量在w686中暂时不使用
 		printf("\r\nFormat the eeprom\r\n");
 		FS_FactroyValue();
 		Flag.NeedUpdateFs = 1;
@@ -172,12 +177,13 @@ void FS_InitValue(void)
 
 	printf("Device suitable for China\r\n\r\n");
 
-	printf("Device IMEI: 	 %s\r\n", Fs.DeviceImei);
+	printf("Device IMEI: 	 %s\r\n", Fs.UserID);
 	printf("Fs.IpAdress: 	 %s\r\n", Fs.IpAdress);
 	printf("Fs.IpPort:       %s\r\n", Fs.IpPort);
 	printf("Fs.ApnName: 	 %s\r\n", Fs.ApnName);
 	printf("Fs.GprsUserName: %s\r\n", Fs.GprsUserName);
 	printf("Fs.GprsPassWord: %s\r\n", Fs.GprsPassWord);
+	printf("Fs.Interval:     %d\r\n", Fs.Interval);
 	printf("\r\n-----------------------------------------\r\n");
 }
 

@@ -63,6 +63,7 @@ typedef struct{
 	unsigned char   ShutDownMin;		//关机时间段，分钟
 	unsigned char   BootHour;			//开机时间段，小时
 	unsigned char   BootMin;			//开机时间段，分钟
+	unsigned char   GsensorType;		//Gsnesor的工作模式，只在设置模式下打印用
 
 }FS;
 #endif

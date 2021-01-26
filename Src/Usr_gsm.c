@@ -16,34 +16,46 @@ void BcdStr2HexStr(char *pSrc, char *pDst)
 void Usr_ModuleGoSleep(void)
 {
 
-	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup) 
+#if DEEP_SLEEP_MODE
+	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup) 	//使用深度休眠
+#else
+	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup || Flag.NoSleepMode) 	//不使用深度休眠
+#endif
 	{
 		return;
 	}
 
 	Flag.ModuleWakeup = 0;
 	Flag.ModuleSleep = 1;
-	Flag.NeedModuleOff = 1;
 	Flag.IsGpsOn = 0;
 
 	GREEN_OFF;
 	RED_OFF;
 
+#if MODULE_OFF_MODE
+	Flag.NeedModuleOff = 1;
 	if(Flag.ModuleOn)
 	{
 		Usr_ModuleTurnOff();
 	}
-
-	if(Flag.InNoShockSleep)
-	{
-		G_Sensor_Pwr(0);
-		Flag.GsensorClose = 1;
-		printf("Auto shut down!\r\n");
-	}
+	POWER_OFF;
+#else
+    MODULE_WAKEUP_SET;				//拉高DTR，让设备模块进入睡眠模式
+#endif
+	// if(Flag.InNoShockSleep)
+	// {
+	// 	G_Sensor_Pwr(0);
+	// 	Flag.GsensorClose = 1;
+	// 	printf("Auto shut down!\r\n");
+	// }
 
 	if(NoShockCnt > 300)
 	{
+	#if DEEP_SLEEP_MODE
 		printf("\r\nsystem go to deep sleep!\r\n");
+	#else
+		printf("\r\nsystem sleep!\r\n");
+	#endif
 	}
 	else
 	{
@@ -51,7 +63,6 @@ void Usr_ModuleGoSleep(void)
 	}
 	
 	LL_mDelay(100);		//留一个时间窗口给串口打印数据
-	POWER_OFF;
 	GPS_OFF;
 //	Close_ADC();
 
@@ -93,11 +104,12 @@ sleep:
 	}
 	
 	Usr_InitHardware();
-	if(Flag.GsensorClose)
-	{
-		G_Sensor_Pwr(1);
-		Flag.GsensorClose = 0;
-	}
+	
+	// if(Flag.GsensorClose)
+	// {
+	// 	G_Sensor_Pwr(1);
+	// 	Flag.GsensorClose = 0;
+	// }
 	
 
 }
@@ -123,8 +135,12 @@ void Usr_ModuleWakeUp(void)
 		GprsSend.posFlag = 1;
 		NoGpsRestartCnt = 0;			//唤醒的时候需要清0未搜索到gps计数
 		Flag.NeedGpsOpen = 1;
-		Flag.NeedModuleOn = 1;
 		WifiScanDelay = 0;				//清除wifi扫描等待
+	#if MODULE_OFF_MODE
+		Flag.NeedModuleOn = 1;
+	#else
+		MODULE_WAKEUP_RESET;
+	#endif
 		printf("\r\n Need send Location data\r\n");
 	}
 	else if(WakeUpType == 1)
@@ -132,7 +148,11 @@ void Usr_ModuleWakeUp(void)
 		WakeUpType = 0;
 		GprsSend.handFlag = 1;
 		Flag.NeedGpsOpen = 0;
+	#if MODULE_OFF_MODE
 		Flag.NeedModuleOn = 1;
+	#else
+		MODULE_WAKEUP_RESET;
+	#endif
 		printf("\r\n Need send Hand data\r\n");
 	}
 
@@ -195,7 +215,7 @@ void Usr_ModuleTurnOff(void)
 	printf("Ready turn off the GSM module\r\n");
 	Flag.HaveSmsReady = 0;
 	Flag.NeedModuleOff = 0;
-	Flag.ModuleOn = 0;
+//	Flag.ModuleOn = 0;
 	Flag.PsSignalOk = 0; 
 	Flag.ModePwrDownNormal = 0;
 	Flag.IsContextAct = 0;
@@ -217,25 +237,29 @@ void Usr_ModuleTurnOff(void)
 	AtType = AT_NULL;
 
 	GREEN_ON;
-	
-	while (Flag.HavePwdMode)
+	if(Flag.ModuleOn)
 	{
-		if (strstr(Uart1Buf, "NORMAL POWER DOWN") && !Flag.ModePwrDownNormal)
-		{
-			Flag.ModePwrDownNormal = 1;
-			printf("\r\nNORMAL POWER DOWN!\r\n");
-		}
+		Flag.ModuleOn = 0;
 
-		if ((ModePwrDownCnt <= 0) || Flag.ModePwrDownNormal)
+		while (Flag.HavePwdMode)
 		{
-			POWER_OFF;
-			GREEN_OFF;
-			delay_ms(500);
-			Flag.HavePwdMode = 0;
-			printf("\r\nModule turn off!\r\n");
-		}
+			if (strstr(Uart1Buf, "NORMAL POWER DOWN") && !Flag.ModePwrDownNormal)
+			{
+				Flag.ModePwrDownNormal = 1;
+				printf("\r\nNORMAL POWER DOWN!\r\n");
+			}
 
-		LL_mDelay(100);
+			if ((ModePwrDownCnt <= 0) || Flag.ModePwrDownNormal)
+			{
+				POWER_OFF;
+				GREEN_OFF;
+				delay_ms(500);
+				Flag.HavePwdMode = 0;
+				printf("\r\nModule turn off!\r\n");
+			}
+
+			LL_mDelay(100);
+		}
 	}
 	UART_AtInit();	//有的时候关机前AT串口接收到了数据没有处理，重启开机后，这个数据会干扰程序判断
 }
@@ -330,7 +354,7 @@ void Usr_Device_ShutDown(void)
 	Flag.SysShutDown = 1;
 
 stop:
-	#if 1
+	#if 0
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
 	LL_LPM_EnableDeepSleep();
 	__WFI();

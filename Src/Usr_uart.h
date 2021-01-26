@@ -27,6 +27,7 @@ void UART_Send(USART_TypeDef *USARTx, uint8_t *data,uint16_t dataleng);
 
 void UART_Handle(void);
 void At_Receive(void);
-
+void Debug_Receive(void);
+void UART_DebugInit(void);
 #endif
 

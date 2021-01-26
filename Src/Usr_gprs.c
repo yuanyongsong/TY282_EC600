@@ -9,6 +9,7 @@ unsigned short At_Timeout_Cnt;	//等待AT超时的时间，用于等待非标准
 unsigned short PacketSerialNum;	//发送数据包流水号
 unsigned int ActiveTimer;
 unsigned char WifiCnt;			//搜索到的wifi数量
+unsigned char FindDeviceCnt;	//收到寻找设备指令，LED闪灯计时
 u32  speed_gprs;
 char UserIDBuf[16];
 char GprsSendBuf[DATABUFLEN];
@@ -399,7 +400,7 @@ u16 WIRELESS_GprsSendPacket(GPRS_TYPE switch_tmp)
 	if(switch_tmp != AGPSDATA)
 	{
 		content_len = strlen(GprsContent);
-		sprintf(GprsSendBuf, "S168#%s#%04X#%04X#%s$",IMEI,PacketSerialNum,content_len,GprsContent);
+		sprintf(GprsSendBuf, "S168#%s#%04X#%04X#%s$",Fs.UserID,PacketSerialNum,content_len,GprsContent);
 	}
 
 	data_len = strlen(GprsSendBuf);

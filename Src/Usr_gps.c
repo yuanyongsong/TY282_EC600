@@ -481,6 +481,7 @@ void chang_someone_data(char *DM, unsigned char len)
 	strcpy(DM, temp);
 }
 
+#if 0
 /*
 注意，由于纬度越高，纬度方向上相差相同的距离时经度变化范围越大，
 以广东纬度小于30为例：经度0.03分约55m，约198km/h
@@ -631,10 +632,10 @@ unsigned char chkLatLon(void)
 	SchkLon = lon;
 	return 1;
 }
-
+#else
 //更新LAST_LAT_BUF和LAST_LON_BUF，并判断经纬度值变化是否大于1度
 //变化大于3分，返回0
-/*
+
 unsigned char chkLatLon(void)
 {	
 	char chkLat[7]={0};
@@ -698,7 +699,7 @@ unsigned char chkLatLon(void)
 	return 1;
 	
 }
-*/
+#endif
 //计算并转换速度值,整数保存在speedByte，字符串形式保存在SPEED_TMP
 void chane_speed(void)
 {
@@ -1125,7 +1126,7 @@ void GPS_DataProcess(char *pSrc)
 	{
 
 		//VALUE_BUFF='\0';
-		if (++validCnt > GPS_VALID_CNT) //20151215_4
+		if (++validCnt > GPS_VALID_CNT) //不使用前5个定位点
 		{
 
 			validCnt = GPS_VALID_CNT;
@@ -1136,7 +1137,7 @@ void GPS_DataProcess(char *pSrc)
 			strcpy(LongitudeBuffAlarm, LongitudeBuff);
 			strcpy(LatitudeBuffAlarm, LatitudeBuff);
 
-			if (chkLatLon())
+			if (1)
 			{
 				chane_speed();
 				make_speed();

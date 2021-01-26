@@ -47,6 +47,8 @@
 #define NO_SENSOR           0x01
 #define AUTO_SHUTDOWN       0x02
 
+#define SETTING_MODE		0x04
+
 typedef enum
 {
 FALSE =0,
@@ -245,6 +247,7 @@ typedef struct FLAG_
 	unsigned char GsensorClose:1;				//G sensor关闭
 	unsigned char NeedPrintf:1;					//需要打印数据
 	
+	unsigned char DeviceInSetting:1;			//设备出于设置模式
 
 }FLAG;
 #endif

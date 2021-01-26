@@ -491,7 +491,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 	case AT_CGREG:
 		if (strstr(pSrc, "+CGREG:"))
 		{
-			if (strstr(pSrc, "2,1") || strstr(pSrc, "2,5"))
+			if (strstr(pSrc, "2,1,") || strstr(pSrc, "2,5,"))
 			{
 
 				if (Flag.PsSignalChk && Flag.GprsConnectOk && (ConnectDelayCnt > 0))
@@ -838,7 +838,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			//如果是休眠期间周期性唤醒时上传数据成功，ActiveTimer = 2即刻进入休眠
 			if(((Flag.Insleeping) || (GprsSend.posCnt == 0)) && (!Flag.NoSleepMode))
 			{
-				ActiveTimer = 3;
+				ActiveTimer = 5;
 			}	
 			
 			error2 = 0;
@@ -1120,6 +1120,10 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			if (*p1 == ' ')
 				p1++;
 			ptem = strchr(p1, ',');
+
+			if(ptem == NULL)
+			break;
+
 			strncpy(temp, p1, (ptem - p1));
 			i = Usr_Atoi(temp);
 			Rssi = i;
@@ -1267,6 +1271,12 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			back = 1;
 			AtDelayCnt = 0;
 			*temType = AT_NULL;
+		}
+		else if(strstr(pSrc, "ERROR") != NULL)
+		{
+			back = 1;
+			AtDelayCnt = 0;
+			*temType = AT_NULL;			
 		}
 	break;
 

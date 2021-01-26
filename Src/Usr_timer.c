@@ -401,6 +401,10 @@ void TIMER_SecCntHandle(void)
 			Flag.NeedDeviceRst = 1;
 	}
 
+	if(FindDeviceCnt > 0)
+	{
+		FindDeviceCnt --;
+	}
 
 	if (!Flag.NoSleep && ActiveTimer > 0 && !Flag.IsUpgrate)
 	{
@@ -464,7 +468,7 @@ void TIMER_SecCntHandle(void)
 		#if NO_SLEEP
 		GprsSend.posCnt = 1;
 		#endif
-		printf("It's the time to send MQTT sensor data...\r\n");
+//		printf("It's the time to send MQTT sensor data...\r\n");
 	}
 
 
@@ -519,7 +523,28 @@ void TIMER_BaseCntHandle(void)
 	{
 		RED_ON;
 	}
-
+	else if(FindDeviceCnt > 0)
+	{
+		if(ledCnt <= 5)
+		{
+			RED_ON; 
+			GREEN_ON;				
+		}
+		else
+		{
+			RED_OFF; 
+			GREEN_OFF;
+			if(ledCnt >= 10)	
+			{
+				ledCnt = 0;
+			}			
+		}
+	}
+	else if(Flag.DeviceInSetting)
+	{
+		RED_ON; 
+		GREEN_ON;		
+	}
 	else
 	{
 		switch (ledCnt)
@@ -868,15 +893,15 @@ void RTC_TAMP_IRQHandler(void)
 				Flag.IrNoNeedWakeUp = 0;
 				ActiveTimer = 100;
 			}
-			else if(WakeupCnt % 5 == 0)
-			{
-				WakeUpType = 1;
+			// else if(WakeupCnt % 5 == 0)
+			// {
+			// 	WakeUpType = 1;
 
-				Flag.ModuleSleep = 0;
-				Flag.ModuleWakeup = 1;
-				Flag.IrNoNeedWakeUp = 0;
-				ActiveTimer = 100;
-			}
+			// 	Flag.ModuleSleep = 0;
+			// 	Flag.ModuleWakeup = 1;
+			// 	Flag.IrNoNeedWakeUp = 0;
+			// 	ActiveTimer = 100;
+			// }
 
         } 
 
@@ -885,7 +910,9 @@ void RTC_TAMP_IRQHandler(void)
 		{
 			if(NoShockCnt >= 300)
 			{
+			#if DEEP_SLEEP_MODE
 				Flag.DeviceInDeepSleep = 1;
+			#endif
 			}
 		}
 

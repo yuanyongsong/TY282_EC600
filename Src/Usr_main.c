@@ -125,7 +125,30 @@ void Usr_InitValue(void)
 	Flag.WaitAtAck = 0;
 	WatchDogCnt = 0;
 
-	FS_InitValue();						
+	FS_InitValue();			
+
+	//如果设备ID没有初始化，这里自动串口参数设置模式，等待通过串口初始化
+	if(memcmp(Fs.UserID,"000000000000000",15) == 0)		
+	{
+		Flag.DeviceInSetting = 1;
+		printf("Device ID not set,please set device ID frist!\r\n");
+	}	
+
+	if(Fs.ModeSet & SETTING_MODE)
+	{
+		Flag.DeviceInSetting = 1;
+	}
+
+	while(Flag.DeviceInSetting)
+	{
+		if (Flag.Uart3HaveData && !Uart3RecCnt)
+		{
+			Debug_Receive();
+			UART_DebugInit();
+		}
+		WatchDogCnt = 0;
+		delay_ms(10);
+	}
 
 	memset(&Fs.FsUpg,0,sizeof(Fs.FsUpg));
   	//EXFLASH_ReadBuffer((u8 *)&FsUpg,FLASH_UPG_ADDR,sizeof(FsUpg));
@@ -182,11 +205,17 @@ void Usr_InitValue(void)
 	{
 		RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
 	}
-	
+
 	if(G_Sensor_init())
 	{
 		printf("G sensor init ok\r\n");
+	}	
+
+	if(Fs.ModeSet & NO_SENSOR)
+	{
+		G_Sensor_Pwr(0);		
 	}
+
 }
 
 void Flag_Check(void)

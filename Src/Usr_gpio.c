@@ -368,8 +368,12 @@ void StopMode_TurnOff_Some_GPIOs(void)
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    //二氧化碳传感器供电使能脚，PC4；模块供电维持，PC7；
+    //模块供电维持，PC7；如果是设备休眠时模块休眠模式，应保留该位状态
+#if MODULE_OFF_MODE
     GPIO_InitStruct.Pin = LL_GPIO_PIN_ALL;
+#else
+    GPIO_InitStruct.Pin = (~(LL_GPIO_PIN_7));
+#endif
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOC, &GPIO_InitStruct);

@@ -106,7 +106,339 @@ void UART_Gps_Init(void)
 
 void Debug_Receive(void)
 {
+	char *p0 = NULL;
+	char *p1 = NULL;
 
+	if (strstr(Uart3Buf, "AT^TST"))
+	{
+		Fs.ModeSet |= SETTING_MODE;
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+		delay_ms(10);
+		printf("Enter Setting Mode...\r\n");
+		NVIC_SystemReset();
+	}
+
+	if(Flag.DeviceInSetting == 0)
+	{
+		printf("Please send \"AT^TST\" go to Setting mode frist!\r\n");
+		return;
+	}
+
+	//设置IMEI
+	if(strstr(Uart3Buf, "AT^IMEI="))
+	{
+		p0 = strstr(Uart3Buf, "AT^IMEI=");
+		p1 = strstr(Uart3Buf, "\r\n");
+		p0 += 8;
+
+		if(p1 - p0 == 15)
+		{
+			memset(Fs.UserID, 0, sizeof(Fs.UserID));
+			strncpy(Fs.UserID, p0, p1 - p0);
+			Flag.NeedUpdateFs = 1;
+			FS_UpdateValue();
+			printf("Device IMEI:%s\r\n",Fs.UserID);
+		}
+		else
+		{
+			printf("Device IMEI setting error!\r\n");
+		}		
+	}
+	//设置域名和端口
+	else if(strstr(Uart3Buf, "AT^IP="))				
+	{
+		p0 = strstr(Uart3Buf, "AT^IP=");
+		p1 = strstr(Uart3Buf, ",");
+		p0 += 6;
+
+		if(p1 - p0 <= sizeof(Fs.IpAdress))
+		{
+			memset(Fs.IpAdress, 0, sizeof(Fs.IpAdress));
+			strncpy(Fs.IpAdress, p0, p1 - p0);
+		}
+		else
+		{
+			printf("Ip Adress setting too long!\r\n");
+			return;
+		}	
+
+		p0 = p1 + 1;
+		p1 = strstr(p0, "\r\n");
+
+		if(p1 - p0 <= sizeof(Fs.IpPort))
+		{
+			memset(Fs.IpPort, 0, sizeof(Fs.IpPort));
+			strncpy(Fs.IpPort, p0, p1 - p0);
+			Flag.NeedUpdateFs = 1;
+			FS_UpdateValue();
+			printf("Ip Adress and port:%s,%s\r\n",Fs.IpAdress,Fs.IpPort);
+		}
+		else
+		{
+			printf("Ip Adress setting error!\r\n");
+		}	
+	}
+	//APN设置
+	else if(strstr(Uart3Buf, "AT^APN="))
+	{
+		p0 = strstr(Uart3Buf, "AT^APN=");
+		p1 = strstr(Uart3Buf, ",");
+		p0 += 7;
+
+		if(p1 - p0 <= sizeof(Fs.ApnName))
+		{
+			memset(Fs.ApnName, 0, sizeof(Fs.ApnName));
+			strncpy(Fs.ApnName, p0, p1 - p0);
+		}
+		else
+		{
+			printf("Device APN setting error!\r\n");
+			return;
+		}
+
+		p0 = p1 + 1;
+		p1 = strstr(p0, ",");
+
+		if(p1 - p0 <= sizeof(Fs.GprsUserName))
+		{
+			memset(Fs.GprsUserName, 0, sizeof(Fs.GprsUserName));
+			strncpy(Fs.GprsUserName, p0, p1 - p0);
+		}	
+		else
+		{
+			printf("Device APN User Name setting error!\r\n");
+			return;
+		}	
+
+		p0 = p1 + 1;
+		p1 = strstr(p0, ",");
+
+		if(p1 - p0 <= sizeof(Fs.GprsPassWord))
+		{
+			memset(Fs.GprsPassWord, 0, sizeof(Fs.GprsPassWord));
+			strncpy(Fs.GprsPassWord, p0, p1 - p0);
+			Flag.NeedUpdateFs = 1;
+			FS_UpdateValue();
+			printf("Device APN:%s,%s,%s\r\n",Fs.ApnName,Fs.GprsUserName,Fs.GprsPassWord);
+		}	
+		else
+		{
+			printf("Device APN PassWord setting error!\r\n");
+		}
+	}
+	//设置震动传感器灵敏度，0关1高2中3低
+	else if(strstr(Uart3Buf, "AT^GSENSOR="))				
+	{
+		p0 = strstr(Uart3Buf, "AT^GSENSOR=");
+		p1 = strstr(Uart3Buf, "\r\n");
+		p0 += 11;
+
+		if(p1 - p0 == 1)
+		{
+			switch (*p0)
+			{
+			case '0':
+				Fs.ModeSet |= NO_SENSOR;
+				break;
+			case '1':
+				Fs.Sensor = SENSOR_HIGH;
+				break;
+			case '2':
+				Fs.Sensor = SENSOR_NORMAL;
+				break;
+			case '3':
+				Fs.Sensor = SENSOR_LOW;
+				break;			
+			default:
+				printf("GSENSOR setting error!\r\n");
+				break;
+			}
+			Fs.GsensorType = (unsigned char)atoi(p0);
+			Flag.NeedUpdateFs = 1;
+			FS_UpdateValue();
+			printf("GSENSOR Setting:%d\r\n",Fs.GsensorType);
+		}
+		else
+		{
+			printf("GSENSOR setting error!\r\n");
+			return;
+		}		
+	}
+	//设置上传时间间隔
+	else if(strstr(Uart3Buf, "AT^UP="))				
+	{
+		p0 = strstr(Uart3Buf, "AT^UP=");
+		p1 = strstr(Uart3Buf, "\r\n");
+		p0 += 6;
+
+		Fs.Interval = (unsigned int)atoi(p0);
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+		printf("Data Interval:%d\r\n",Fs.Interval);
+	}
+	//设置上传时间间隔
+	else if(strstr(Uart3Buf, "AT^APOF="))				
+	{
+		u8 data_temp;
+
+		p0 = strstr(Uart3Buf, "AT^APOF=");
+		p1 = strstr(Uart3Buf, "\r\n");
+		p0 += 8;
+
+
+		if(*p0 == '0')			Fs.ModeSet &= ~AUTO_SHUTDOWN;
+		else if(*p0 == '1')		Fs.ModeSet |= AUTO_SHUTDOWN;
+		else 					
+		{
+			printf("Auto power on and off setting error!\r\n");
+			return;
+		}
+		
+
+		p0 = strstr(p0,",");
+		p0 ++;
+
+		
+		data_temp = (u8)atoi(p0);
+		if(data_temp <= 24)
+		{
+			Fs.ShutDownHour = data_temp;
+		}
+		else
+		{
+			printf("Auto power on and off setting error!\r\n");
+			return;			
+		}
+		p0 = strstr(p0,",");
+		p0 ++;
+
+		data_temp = (u8)atoi(p0);
+		if(data_temp <= 60)
+		{
+			Fs.ShutDownMin = data_temp;
+		}
+		else
+		{
+			printf("Auto power on and off setting error!\r\n");
+			return;			
+		}
+
+		p0 = strstr(p0,",");
+		p0 ++;
+
+		data_temp = (u8)atoi(p0);
+		if(data_temp <= 24)
+		{
+			Fs.BootHour = data_temp;
+		}
+		else
+		{
+			printf("Auto power on and off setting error!\r\n");
+			return;			
+		}
+
+		if(Fs.BootHour < Fs.ShutDownHour)			//如果时间跨天了，开机时间加24
+		{
+			Fs.BootHour += 24;
+		}
+
+		p0 = strstr(p0,",");
+		p0 ++;
+
+		data_temp = (u8)atoi(p0);
+		if(data_temp <= 60)
+		{
+			Fs.BootMin = data_temp;
+		}
+		else
+		{
+			printf("Auto power on and off setting error!\r\n");
+			return;			
+		}
+
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+
+		printf("Auto power:%d,%d,%d,%d,%d\r\n",
+		(Fs.ModeSet & AUTO_SHUTDOWN),Fs.ShutDownHour,Fs.ShutDownMin,Fs.BootHour,Fs.BootMin);
+	}
+	//重启
+	else if(strstr(Uart3Buf, "AT^REBOOT=1"))
+	{
+		Fs.ModeSet &= ~SETTING_MODE;
+		Flag.DeviceInSetting = 0;
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+		printf("Ready restart device...\r\n");
+		delay_ms(10);
+		NVIC_SystemReset();
+	}
+	//关机
+	else if(strstr(Uart3Buf, "AT^SHUT="))
+	{
+		u8 delay_time;
+
+		p0 = strstr(Uart3Buf, "AT^SHUT=");
+		p1 = strstr(Uart3Buf, "\r\n");
+		p0 += 8;
+
+		delay_time = (unsigned int)atoi(p0);
+		printf("Device will turn off after %ds\r\n",delay_time);
+
+		Fs.ModeSet &= ~SETTING_MODE;
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+
+		while(delay_time)
+		{
+			delay_ms(1000);
+			delay_time --;
+		}
+		Flag.DeviceInSetting = 0;
+		printf("Ready turn off device...\r\n");
+		Flag.NeedShutDown = 1;
+		Usr_Device_ShutDown();
+	}
+	//恢复出厂设置
+	else if(strstr(Uart3Buf, "AT^FACTORY"))
+	{
+		FS_FactroyValueFile();
+		printf("Have set device to factory setting\r\n");
+	}
+	//寻找设备
+	else if(strstr(Uart3Buf, "AT^FINDME"))
+	{
+		FindDeviceCnt = 60;
+		printf("Device start flash leds for 60s...\r\n");
+	}
+	//查询设备参数
+	else if(strstr(Uart3Buf, "AT^PARAM=?"))				
+	{
+		printf("\r\n------Device parameters as follows:------\r\n");
+		printf("Device IMEI: 	 %s\r\n", Fs.UserID);
+		printf("IpAdress:        %s\r\n", Fs.IpAdress);
+		printf("IpPort:          %s\r\n", Fs.IpPort);
+		printf("ApnName:         %s\r\n", Fs.ApnName);
+		printf("GprsUserName:    %s\r\n", Fs.GprsUserName);
+		printf("GprsPassWord:    %s\r\n", Fs.GprsPassWord);
+		printf("Interval:        %d\r\n", Fs.Interval);
+		printf("GSENSOR:         %d\r\n", Fs.GsensorType);
+		printf("Auto power:      %d,%d,%d,%d,%d\r\n",
+		(Fs.ModeSet & AUTO_SHUTDOWN),Fs.ShutDownHour,Fs.ShutDownMin,Fs.BootHour,Fs.BootMin);
+		printf("\r\n-----------------------------------------\r\n");
+	}
+	//退出测试模式
+	else if(strstr(Uart3Buf, "AT^QUIT"))
+	{
+		Fs.ModeSet &= ~SETTING_MODE;
+		Flag.DeviceInSetting = 0;
+		Flag.NeedUpdateFs = 1;
+		FS_UpdateValue();
+		printf("Device Setting Over,Ready restart device...\r\n");
+		delay_ms(10);
+		NVIC_SystemReset();
+	}
 }
 
 void UART_DebugInit(void)
