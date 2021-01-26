@@ -158,8 +158,6 @@ typedef struct FLAG_
 	unsigned char ModuleWakeup:1;	  //模块退出休眠
 	unsigned char Insleeping:1 ;       //设备处于休眠状态，只是中途唤醒
 	unsigned char IrNoNeedWakeUp:1;	  //红外从休眠模式退出时不需要唤醒系统
-	unsigned char Bma250NeedInit:1;	  //需要初始化BMA250
-	unsigned char Bma250InitOk:1;	  //Bma250初始化成功
 	unsigned char IsContextAct:1;	  //置位表示场景被激活
 	unsigned char HaveSmsReady:1;	  //已经出现READY,再次出现ready时不重新走初始化AT流程
 	unsigned char AtInitCmd:1;
@@ -261,6 +259,8 @@ extern unsigned char  CheckModeCnt;
 extern unsigned int  NoShockCnt;
 extern unsigned char ModePwrDownCnt;
 extern unsigned short WaitAtTime;
+extern unsigned char WorkMode;	
+extern unsigned short IdlingKeepTime;
 extern char Edition[50];
 
 void Usr_ModuleWakeUp(void);

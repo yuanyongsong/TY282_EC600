@@ -161,21 +161,10 @@ void FS_InitValue(void)
 		return;
 	}
 
-	if (Fs.FsUpg.UpgEnJamp == 0xaa)
-	{
-		//		Flag.UpgrateAppSuccess = 1;
-		Fs.FsUpg.UpgNeedSendGprs = 0;
-		Flag.NeedUpgradeResultResponse = 1;
-	}
-	else if (Fs.FsUpg.UpgNeedSendGprs)
-	{
-		Fs.FsUpg.UpgNeedSendGprs = 0;
-		Flag.NeedUpgradeResultResponse = 1;
-	}
 
 	printf("\r\n------Device parameters as follows:------\r\n\r\n");
 
-	printf("Device suitable for China\r\n\r\n");
+	printf("Device ID: 	     %s\r\n", Fs.UserID);
 
 	printf("Device IMEI: 	 %s\r\n", Fs.UserID);
 	printf("Fs.IpAdress: 	 %s\r\n", Fs.IpAdress);

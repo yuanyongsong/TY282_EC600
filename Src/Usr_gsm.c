@@ -36,7 +36,12 @@ void Usr_ModuleGoSleep(void)
 	Flag.NeedModuleOff = 1;
 	if(Flag.ModuleOn)
 	{
-		Usr_ModuleTurnOff();
+		Flag.NeedModuleOff = 1;
+		if(Flag.ModuleOn)
+		{
+			Usr_ModuleTurnOff();
+		}
+		POWER_OFF;
 	}
 	POWER_OFF;
 #else
@@ -49,7 +54,7 @@ void Usr_ModuleGoSleep(void)
 	// 	printf("Auto shut down!\r\n");
 	// }
 
-	if(NoShockCnt > 300)
+	if(WorkMode == 1)
 	{
 	#if DEEP_SLEEP_MODE
 		printf("\r\nsystem go to deep sleep!\r\n");
@@ -64,12 +69,13 @@ void Usr_ModuleGoSleep(void)
 	
 	LL_mDelay(100);		//留一个时间窗口给串口打印数据
 	GPS_OFF;
+	Flag.HaveGPS = 0;
 //	Close_ADC();
 
 	Sys_Setting_Before_StopMode();
 
 	Flag.Insleeping = 1;						//在要进入休眠时再置位该标志
-
+	ValidShocksCnt = 0;
 sleep:
 	#if 1
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
@@ -97,9 +103,16 @@ sleep:
 		delay_ms(10);		
 	}
 
-	if(!Flag.ModuleWakeup)			//如果按键按下没超过三秒
+	while(DevPerWakeUpCnt > 0)
+	{
+		delay_ms(10);
+	}
+
+	if(!Flag.ModuleWakeup)								//如果没有成功唤醒
 	{
 		SysPoweKeyTimer = 0;
+		ValidShocksCnt = 0;				//清除有效触发次数
+		Flag.DevPreWakeUp = 0;			//清除预唤醒状态，让系统重新回到休眠模式
 		goto sleep;
 	}
 	

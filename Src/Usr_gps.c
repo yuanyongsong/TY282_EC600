@@ -1191,7 +1191,7 @@ void GPS_DataProcess(char *pSrc)
 						}
 						else if (DegreeHandle())
 						{
-							Flag.OtherSendPosi = 1;
+						//	Flag.OtherSendPosi = 1;
 						}
 					}
 					else
@@ -1211,7 +1211,7 @@ void GPS_DataProcess(char *pSrc)
 						//保存过堵车经纬度后，判断位移是否超过200米
 						else if (MoveHandle())
 						{
-							Flag.OtherSendPosi = 1;
+						//	Flag.OtherSendPosi = 1;
 							HaveMoveCnt = 0;
 							//超过规定位移，更新基准点
 							MoveData.LatSetted = GPS_GetDegreeFrmStr(LatitudeBuff, 0);

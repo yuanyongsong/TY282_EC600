@@ -121,7 +121,6 @@ void Debug_Receive(void)
 
 	if(Flag.DeviceInSetting == 0)
 	{
-		printf("Please send \"AT^TST\" go to Setting mode frist!\r\n");
 		return;
 	}
 
@@ -430,10 +429,10 @@ void Debug_Receive(void)
 	}
 	//退出测试模式
 	else if(strstr(Uart3Buf, "AT^QUIT"))
+=======
+	else if(strstr(Uart3Buf, "ChangeID="))
 	{
-		Fs.ModeSet &= ~SETTING_MODE;
-		Flag.DeviceInSetting = 0;
-		Flag.NeedUpdateFs = 1;
+		p0 = strstr(Uart3Buf, "ChangeID=");
 		FS_UpdateValue();
 		printf("Device Setting Over,Ready restart device...\r\n");
 		delay_ms(10);
