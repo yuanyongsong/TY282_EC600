@@ -3,6 +3,7 @@
 
 #include "usr_main.h"
 
+//#define     GSENSOR_ID          0x26
 #define     GSENSOR_ID          0x4C
 
 #define 	SDA_HIGH 			LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_10)

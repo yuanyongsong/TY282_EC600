@@ -17,7 +17,7 @@ unsigned char WakeUpType;	//设备唤醒原因，1为需要上传心跳包唤醒
 
 unsigned char NowHour;		//由时间戳计算出来的当前的小时，用于自动开关机
 unsigned char NowMin;		//由时间戳计算出来的当前分钟，用于自动开关机
-
+unsigned int  ChargingCnt;	//充电时间，用于判断低电告警用
 unsigned char WakeUpType;
 
 unsigned char AT_CBC_IntervalTemp; 	//电池电量采样间隔
@@ -88,6 +88,126 @@ void SystemClock_Config(void)
   
 }
 
+//主频32M，分频320，pwm时钟频率100k，pwm周期200Hz，那么ARR=499
+void Pwm_TIM14_Init(void)
+{
+	uint32_t timxPeriod = 499;
+
+	LL_TIM_InitTypeDef TIM_InitStruct = {0};
+	LL_TIM_OC_InitTypeDef TIM_OC_InitStruct = {0};
+
+	LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	/* Peripheral clock enable */
+	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_TIM14);
+
+	TIM_InitStruct.Prescaler = 319;
+	TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
+	TIM_InitStruct.Autoreload = timxPeriod;
+	TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
+	LL_TIM_Init(TIM14, &TIM_InitStruct);
+	LL_TIM_EnableARRPreload(TIM14);
+	LL_TIM_OC_EnablePreload(TIM14, LL_TIM_CHANNEL_CH1);				//使能通道1的比较寄存器
+	TIM_OC_InitStruct.OCMode = LL_TIM_OCMODE_PWM1;
+	TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_DISABLE;
+	TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
+	TIM_OC_InitStruct.CompareValue = ((timxPeriod + 1 ) / 2);
+	TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_HIGH;			//选择极性为高
+	LL_TIM_OC_Init(TIM14, LL_TIM_CHANNEL_CH1, &TIM_OC_InitStruct);
+	LL_TIM_OC_DisableFast(TIM14, LL_TIM_CHANNEL_CH1);
+	LL_TIM_SetTriggerOutput(TIM14, LL_TIM_TRGO_RESET);
+	LL_TIM_DisableMasterSlaveMode(TIM14);
+	/* USER CODE BEGIN TIM3_Init 2 */
+
+	/* Enable the capture/compare interrupt for channel 1 */
+	LL_TIM_EnableIT_CC1(TIM14);
+
+
+	/* Enable output channel 1 */
+	LL_TIM_CC_EnableChannel(TIM14, LL_TIM_CHANNEL_CH1);
+
+	/* Enable counter */
+	LL_TIM_EnableCounter(TIM14);
+
+	/* Force update generation */
+	LL_TIM_GenerateEvent_UPDATE(TIM14);
+
+	/* USER CODE END TIM3_Init 2 */
+	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOA);
+	/**TIM3 GPIO Configuration
+	 PA6   ------> TIM3_CH1
+	*/
+	GPIO_InitStruct.Pin = LL_GPIO_PIN_12;
+	GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
+	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+	GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
+	GPIO_InitStruct.Alternate = LL_GPIO_AF_1;
+	LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+}
+
+//主频32M，分频320，pwm时钟频率100k，pwm周期200Hz，那么ARR=499
+void Pwm_TIM1_Init(void)
+{
+	uint32_t timxPeriod = 499;
+
+	LL_TIM_InitTypeDef TIM_InitStruct = {0};
+	LL_TIM_OC_InitTypeDef TIM_OC_InitStruct = {0};
+
+	LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	/* Peripheral clock enable */
+	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_TIM1);
+
+	TIM_InitStruct.Prescaler = 319;
+	TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
+	TIM_InitStruct.Autoreload = timxPeriod;
+	TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
+	LL_TIM_Init(TIM1, &TIM_InitStruct);
+
+	LL_TIM_EnableARRPreload(TIM1);
+	LL_TIM_OC_EnablePreload(TIM1, LL_TIM_CHANNEL_CH4);				//使能通道1的比较寄存器
+	TIM_OC_InitStruct.OCMode = LL_TIM_OCMODE_PWM1;
+	TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_DISABLE;
+	TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
+	TIM_OC_InitStruct.CompareValue = 0;
+	TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_HIGH;			//选择极性为高
+	LL_TIM_OC_Init(TIM1, LL_TIM_CHANNEL_CH4, &TIM_OC_InitStruct);
+	LL_TIM_OC_DisableFast(TIM1, LL_TIM_CHANNEL_CH4);
+	LL_TIM_SetTriggerOutput(TIM1, LL_TIM_TRGO_RESET);
+	LL_TIM_DisableMasterSlaveMode(TIM1);
+	/* USER CODE BEGIN TIM3_Init 2 */
+
+	/* Enable the capture/compare interrupt for channel 1 */
+	LL_TIM_EnableIT_CC4(TIM1);
+
+
+	/* Enable output channel 1 */
+	LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH4);
+
+	/* Enable counter */
+	LL_TIM_EnableCounter(TIM1);
+
+	/* Force update generation */
+	LL_TIM_GenerateEvent_UPDATE(TIM1);
+
+	LL_TIM_EnableAllOutputs(TIM1);
+
+	/* USER CODE END TIM3_Init 2 */
+	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOA);
+	/**TIM3 GPIO Configuration
+	 PA6   ------> TIM3_CH1
+	*/
+	GPIO_InitStruct.Pin = LL_GPIO_PIN_11;
+	GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
+	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+	GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
+	GPIO_InitStruct.Alternate = LL_GPIO_AF_2;
+	LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
 //主频32M
 void Usr_TIM3_Init(void)
 {
@@ -101,7 +221,7 @@ void Usr_TIM3_Init(void)
     NVIC_EnableIRQ(TIM3_IRQn);
 
     //32M分频3200，计数10000次，产生100ms一次的中断。其他组合配置没有这个精度高
-    TIM_InitStruct.Prescaler = 3200;        
+    TIM_InitStruct.Prescaler = 3199;        
     TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
     TIM_InitStruct.Autoreload = 1000;
     TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
@@ -266,26 +386,6 @@ void TIMER_SecCntHandle(void)
 	baseSecCnt ++;
 
 	NoShockCnt ++;
-	if(NoShockCnt >= 240)
-	{
-		if(WorkMode != 1)
-		{
-			Flag.OtherSendPosi = 1;         //工作模式变化，需要立刻上传数据
-		}
-		WorkMode = 1;	
-	}
-
-	//如果怠速超过5分钟，切换到工作模式
-	if(WorkMode == 2)
-	{
-		IdlingKeepTime ++;
-		if(IdlingKeepTime > 300)
-		{
-			IdlingKeepTime = 0;
-			WorkMode = 3;
-			Flag.OtherSendPosi = 1;
-		}
-	}
 
 	if((UpgInfo.RetryWaitCnt > 0) && (UpgInfo.RetryCnt > 0))
 	{
@@ -379,11 +479,31 @@ void TIMER_SecCntHandle(void)
 	if(DC_DET)
 	{
 		Flag.InCharging = 1;
+		ChargingCnt ++;
+		if(ChargingCnt > 600)
+		{
+			Flag.HaveSendLowPower = 0;
+		}
 	}
 	else
 	{
 		Flag.InCharging = 0;
+		ChargingCnt = 0;
 	}
+
+	if(CHRG_STAT && Flag.InCharging)
+	{
+		Flag.ChargeOver = 0;
+	}
+	else if(Flag.InCharging)
+	{
+		Flag.ChargeOver = 1;
+	}
+	else
+	{
+		Flag.ChargeOver = 0;
+	}
+	
 
 	//如果没有同步时间，30检查一次时间，如果时间已经同步，10分钟更新一次时间
 	if(Flag.HaveSynRtc == 0)
@@ -407,7 +527,7 @@ void TIMER_SecCntHandle(void)
 		AT_CBC_IntervalTemp = 20;
 	}
 
-	if (baseSecCnt % 10 == 2) 
+	if (baseSecCnt % 5 == 2) 
 	{
 		Flag.NeedGetBatVoltage = 1; 			
 	}
@@ -450,11 +570,6 @@ void TIMER_SecCntHandle(void)
 		WifiScanDelay --;
 	}
 	
-	if(DevPerWakeUpCnt > 0)
-	{
-		DevPerWakeUpCnt --;
-	}
-
 	if (WaitUbloxCnt > 0) 
 	{
 		WaitUbloxCnt--;
@@ -533,29 +648,48 @@ void TIMER_BaseCntHandle(void)
 		KeyShocksTimer --;
 	}
 
-	if(SignalShockKeepCnt > 0)
+	if (++ledCnt > 100)
 	{
-		SignalShockKeepCnt --;
+		ledCnt = 0; //周期为10s
 	}
 
-	if (++ledCnt > 32)
-		ledCnt = 0; //周期为4s
 
-
+	
 	if (Flag.ModuleSleep)
 	{
 		RED_OFF; 
 		GREEN_OFF;
+	}
+	else if((KEY0 == 0))
+	{
+		if(Flag.GprsConnectOk)
+		{
+			GREEN_ON;	
+			RED_OFF;
+		}
+		else
+		{
+			GREEN_OFF;
+			RED_ON; 
+		}	
 	}
 	else if (Flag.IsUpgrate)
 	{
 		RED_NEG;
 		GREEN_OFF;
 	}
-
-	else if(Flag.InCharging)
+	else if(baseSecCnt < 4)
 	{
-		RED_ON;
+		if(baseSecCnt < 3)
+		{
+			RED_ON; 
+			GREEN_OFF;
+		}	
+		else
+		{
+			RED_OFF; 
+		}
+			
 	}
 	else if(FindDeviceCnt > 0)
 	{
@@ -579,42 +713,101 @@ void TIMER_BaseCntHandle(void)
 		RED_ON; 
 		GREEN_ON;		
 	}
+	else if(Flag.InCharging)
+	{
+		RED_OFF;	//这里需要清除没连接到平台并且充电时，按键按下松开后的红灯状态
+
+		//在充电时，如果没充满，呼吸灯5秒一个周期，如果充满，常亮led灯
+		if(!Flag.ChargeOver)
+		{
+			if(BreathDir == 0)
+			{
+				BreathCnt ++;
+				BreathData += 5;
+				if(BreathCnt >= 25)
+				{
+					BreathDir = 1;
+				}
+			}
+			else if(BreathDir == 1)
+			{
+				BreathCnt --;
+				BreathData -= 5;
+				if(BreathCnt <= 0)
+				{
+					BreathDir = 0;
+					BreathCnt = 0;
+					BreathData = 0;
+				}		
+			}
+			//呼吸灯最暗时不完全关闭led，如果完全关闭，感觉很奇怪
+			if(BreathData == 0)	
+			{
+				BreathData = 2;
+			}
+			LL_TIM_OC_SetCompareCH4(TIM1, BreathData);
+		}
+		else
+		{
+			if(Flag.GprsConnectOk)
+			{
+				GREEN_ON;	
+				RED_OFF;
+			}
+			else
+			{
+				GREEN_OFF;
+				RED_ON; 
+			}
+		}
+	}
+	else if(Flag.BattLow)
+	{
+		RED_OFF;	//这里需要清除没连接到平台并且充电时，按键按下松开后的红灯状态
+
+		//如果电池电压低，呼吸灯10秒一个周期
+		if(BreathDir == 0)
+		{
+			BreathCnt ++;
+			BreathData += 3;
+			if(BreathCnt >= 50)
+			{
+				BreathDir = 1;
+			}
+		}
+		else if(BreathDir == 1)
+		{
+			BreathCnt --;
+			BreathData -= 3;
+			if(BreathCnt <= 0)
+			{
+				BreathDir = 0;
+				BreathCnt = 0;
+				BreathData = 0;
+			}		
+		}
+		//呼吸灯最暗时不完全关闭led，如果完全关闭，感觉很奇怪
+		if(BreathData == 0)	
+		{
+			BreathData = 2;
+		}
+		LL_TIM_OC_SetCompareCH4(TIM1, BreathData);		
+	}
+	else if(Flag.HaveGPS)
+	{
+		if(ledCnt % 5 == 0)
+		{
+			GREEN_ON;
+		}
+		else
+		{
+			GREEN_OFF;
+		}
+	}
 	else
 	{
-		switch (ledCnt)
-		{
-		case 0:
-			GREEN_ON;
-			break;
-		case 3:
-			if (!Flag.HaveGPS)
-				GREEN_ON;
-			break;
-		case 6:
-			if (Flag.BattLow)
-				GREEN_ON;
-			break;
-		case 9:
-			if (Flag.BattLow)
-				GREEN_ON;
-			break;
-		case 12:
-				RED_ON;
-			break;
-
-		case 15:
-			if (!Flag.GprsConnectOk)
-				RED_ON;
-			break;
-		case 18:
-			break;
-		case 21:
-			break;
-		default:
-			GREEN_OFF;
-			RED_OFF;
-			break;
-		}
+		GREEN_OFF;
+		RED_OFF; 
 	}
 }
 
@@ -860,23 +1053,73 @@ void RTC_TAMP_IRQHandler(void)
 		if (Flag.ModuleSleep)
 		{
 			Flag.RtcInterrupt = 1;
+			NoShockCnt += 60;
+		}
+
+		//如果开启了自动开关机功能，如果在关机时间段内，系统只会周期性唤醒，更新时间戳，不会执行其他操作
+		if((Fs.ModeSet & AUTO_SHUTDOWN) && (Timestamp > 0x50000000))		//确认时间戳已经有效
+		{
+			u8 BootHour_temp = 0;
+
+			GetTimeFormTimeTamp(Timestamp);
+
+			BootHour_temp = NowHour;
+
+			//在进入到如果设置的开机时间到第二天，这里需要将当前时间+24后再计算
+			if(Fs.BootHour > 24) 	
+			{
+				BootHour_temp += 24;
+			}
+
+			if((((NowHour > Fs.ShutDownHour) || ((NowHour == Fs.ShutDownHour) && (NowMin >= Fs.ShutDownMin)))\
+			&& (((BootHour_temp < Fs.BootHour) ||((BootHour_temp == Fs.BootHour) && (NowMin <= Fs.BootMin))))))
+			{
+				Flag.InNoShockSleep = 1;
+
+				//如果设备因为上传时间间隔很短而不休眠的情况，这里需要先关闭，退出时再开启
+				if(Flag.NoSleepMode)
+				{
+					Flag.NoSleepMode = 0;
+				}
+
+				//如果设备在休眠，需要唤醒一下，关闭Gsensor
+				if((Flag.ModuleSleep) && (!Flag.GsensorClose))			
+				{			
+					Flag.ModuleSleep = 0;
+					Flag.ModuleWakeup = 1;
+					WakeUpType = 0;				//设置唤醒类型为0，唤醒后不会开启模块
+				}		
+			}
+			else if(Flag.InNoShockSleep)
+			{
+				//从关机模式下退出来的时候，深度休眠标志位通常已经置位，需要清除一下
+				Flag.DeviceInDeepSleep = 0;		
+				Flag.InNoShockSleep = 0;
+				NoShockCnt = 0;
+
+				//退出时，如果不休眠条件。重新开启不进去休眠
+				if(Fs.Interval <=120)
+				{
+					Flag.NoSleepMode = 1;			
+				}
+			}
+		
 		}
 
 		if(Flag.InNoShockSleep)		return;			//如果是处于自动关机期间，不再周期性唤醒上传数据
 		if(Flag.NoSleepMode)		return;			//如果是非休眠模式下进入的低功耗，只有振动唤醒，RTC不应唤醒
 		
-		if ((Flag.ModuleSleep) && (WorkMode != 1))		//如果还有震动没有进入静止模式，周期性上传定位包
+		if ((Flag.ModuleSleep)&&!Flag.DeviceInDeepSleep)		//如果还有震动没有进入深度睡眠，周期性上传定位包和心跳包
         {
-			if(WakeupCnt % 5 == 0)					//5分钟上传一次定位
+			if(WakeupCnt % (Fs.Interval/60) == 0)
 			{
 				WakeUpType = 2;
 				
 				Flag.ModuleSleep = 0;
 				Flag.ModuleWakeup = 1;
 				Flag.IrNoNeedWakeUp = 0;
-				ActiveTimer = 180;
+				ActiveTimer = 100;
 			}
-<<<<<<< HEAD
 			// else if(WakeupCnt % 5 == 0)
 			// {
 			// 	WakeUpType = 1;
@@ -888,37 +1131,15 @@ void RTC_TAMP_IRQHandler(void)
 			// }
 
         } 
-=======
-
-        } 
-		else if((Flag.ModuleSleep) && (WorkMode == 1))
-		{
-			if(WakeupCnt % 60 == 0)					//如果是静止状态，60分钟上传一次数据
-			{
-				WakeUpType = 2;
-				
-				Flag.ModuleSleep = 0;
-				Flag.ModuleWakeup = 1;
-				Flag.IrNoNeedWakeUp = 0;
-				ActiveTimer = 180;
-			}			
-		}
->>>>>>> cfc6897120fc08673b392d5bd1225f628af94601
 
 		//休眠期间
 		if(Flag.ModuleSleep)
 		{
-			NoShockCnt += 60;
-
-			if(WorkMode == 2)
+			if(NoShockCnt >= 300)
 			{
-<<<<<<< HEAD
 			#if DEEP_SLEEP_MODE
 				Flag.DeviceInDeepSleep = 1;
 			#endif
-=======
-				IdlingKeepTime += 60;
->>>>>>> cfc6897120fc08673b392d5bd1225f628af94601
 			}
 		}
 
@@ -941,3 +1162,30 @@ void TIM3_IRQHandler(void)
         TIMER_BaseCntHandle(); 
     }
 }
+
+
+void TIM1_CC_IRQHandler(void)
+{
+		/* Check whether CC1 interrupt is pending */
+	if(LL_TIM_IsEnabledIT_CC1(TIM1) == 1 && LL_TIM_IsActiveFlag_CC1(TIM1) == 1)
+	{
+	/* Clear the update interrupt flag*/
+	LL_TIM_ClearFlag_CC1(TIM1);
+	}
+	if(LL_TIM_IsEnabledIT_CC2(TIM1) == 1 && LL_TIM_IsActiveFlag_CC2(TIM1) == 1)
+	{
+	/* Clear the update interrupt flag*/
+	LL_TIM_ClearFlag_CC2(TIM1);
+	}
+	if(LL_TIM_IsEnabledIT_CC3(TIM1) == 1 && LL_TIM_IsActiveFlag_CC3(TIM1) == 1)
+	{
+	/* Clear the update interrupt flag*/
+	LL_TIM_ClearFlag_CC3(TIM1);
+	}
+	if(LL_TIM_IsEnabledIT_CC4(TIM1) == 1 && LL_TIM_IsActiveFlag_CC4(TIM1) == 1)
+	{
+	/* Clear the update interrupt flag*/
+	LL_TIM_ClearFlag_CC4(TIM1);
+	}
+}
+

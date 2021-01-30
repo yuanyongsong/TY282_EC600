@@ -3,12 +3,12 @@
 unsigned char KeyDefaultCnt;
 unsigned char KeyPwrActCnt;
 unsigned char ledCnt;
+short         BreathCnt;
+unsigned char BreathDir;
+unsigned short BreathData;
 unsigned char SysPoweKeyCnt;		//系统开关机按键按下计数
 unsigned char SysPoweKeyTimer;		//系统开关机按键按下计时
 unsigned char KeyShocksTimer;		//按键短按判断，判断条件是间隔时间小于1秒
-unsigned char ValidShocksCnt;       //有效震动次数，超过三次有效震动认为是连续震动
-unsigned char SignalShockKeepCnt;   //单次震动有效持续时间，在这个时间段中产生的震动，认为是一次震动
-unsigned char DevPerWakeUpCnt;      //设备预唤醒计时
 
 void GPIO_Hand(void)
 {
@@ -125,7 +125,7 @@ void GPIO_init(void)
     /**/
     GPIO_InitStruct.Pin = LL_GPIO_PIN_14;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+    GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     /**/
@@ -160,14 +160,14 @@ void GPIO_init(void)
     LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
     
 
-    /**/
+    /*
     GPIO_InitStruct.Pin = LL_GPIO_PIN_11;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
     GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
+    */
     /**/
     GPIO_InitStruct.Pin = LL_GPIO_PIN_12;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
@@ -230,6 +230,7 @@ void GPIO_init(void)
     EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
+
     /**/
     LL_GPIO_SetPinPull(GPIOA, LL_GPIO_PIN_0, LL_GPIO_PULL_UP);
     LL_GPIO_SetPinPull(GPIOD, LL_GPIO_PIN_3, LL_GPIO_PULL_UP);
@@ -257,8 +258,6 @@ void GPIO_init(void)
     NVIC_SetPriority(EXTI4_15_IRQn, 2);
     NVIC_EnableIRQ(EXTI4_15_IRQn);
 
-
-    GREEN_ON;
     RED_ON;
     MODULE_WAKEUP_RESET;
 }
@@ -305,7 +304,7 @@ void Exit_GPIO_Interrupt_Init(void)
 void GPIO_Init_Before_Shutdown(void)
 {
     LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-//    LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
+    LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
 	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_ALL);
 
     //不关闭PA13和PA14
@@ -331,20 +330,20 @@ void GPIO_Init_Before_Shutdown(void)
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-#if 0
-    //关机前开启PA0按键中断,按下低电平
-    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE0);
+#if 1
+    //关机前开启PB15，外部供电唤醒中断
+    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTB, LL_EXTI_CONFIG_LINE15);
 
-    EXTI_InitStruct.Line_0_31 = LL_EXTI_LINE_0;
+    EXTI_InitStruct.Line_0_31 = LL_EXTI_LINE_15;
     EXTI_InitStruct.LineCommand = ENABLE;
     EXTI_InitStruct.Mode = LL_EXTI_MODE_IT;
-    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_FALLING;
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
-    LL_GPIO_SetPinPull(GPIOD, LL_GPIO_PIN_3, LL_GPIO_PULL_UP);
-    LL_GPIO_SetPinMode(GPIOD, LL_GPIO_PIN_3, LL_GPIO_MODE_INPUT);
-    NVIC_SetPriority(EXTI0_1_IRQn, 3);
-    NVIC_EnableIRQ(EXTI0_1_IRQn);
+    LL_GPIO_SetPinPull(GPIOB, LL_GPIO_PIN_15, LL_GPIO_PULL_NO);
+    LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_15, LL_GPIO_MODE_INPUT);
+    NVIC_SetPriority(EXTI4_15_IRQn, 2);
+    NVIC_EnableIRQ(EXTI4_15_IRQn);
 #endif
 
     RTC_Close();         //需要关闭RTC
@@ -468,38 +467,44 @@ void EXTI2_3_IRQHandler(void)
         LL_EXTI_ClearFallingFlag_0_31(LL_EXTI_LINE_3);
         if(Flag.ModuleSleep)
         {
-            Flag.RtcInterrupt = 1;
-            
-            if(WorkMode == 1)
+            if(Flag.DeviceInDeepSleep)
             {
-                if(SignalShockKeepCnt == 0)
-                {
-                    SignalShockKeepCnt = 10;
-                    ValidShocksCnt ++;
-                    
-                    if(!Flag.DevPreWakeUp)
-                    {
-                        Flag.DevPreWakeUp = 1;
-                        DevPerWakeUpCnt = 10;       //进入预唤醒模式
-                    }
-
-                    if(ValidShocksCnt >= 3)
-                    {
-                        WorkMode = 2;
-                        IdlingKeepTime = 0;
-                        Flag.OtherSendPosi = 1;         //工作模式变化，需要立刻上传数据
-                        ValidShocksCnt = 0;
-                        DevPerWakeUpCnt = 0;            //将预唤醒计时清零，立刻从预唤醒切换到唤醒模式
-                        Flag.DevPreWakeUp = 0;          //退出预唤醒，进入唤醒模式
-                        Flag.ModuleSleep = 0;
-                        Flag.ModuleWakeup = 1;
-                        ActiveTimer = 120;
-                        WakeUpType = 3;
-                    }
-                }
+                WakeUpType = 3;
+                Flag.DeviceInDeepSleep = 0; 
+                Flag.ModuleSleep = 0;
+                Flag.ModuleWakeup = 1;
+			    ActiveTimer = 120;
+                Flag.RtcInterrupt = 1;
             }
         }
 
+        //如果是因为上传时间间隔短的不休眠模式，在持续无振动180秒后设备也需要进入休眠状态
+        if(Flag.NoSleepMode)
+        {
+            if(Flag.ModuleSleep)
+            {
+                WakeUpType = 3;
+                Flag.ModuleSleep = 0;
+                Flag.ModuleWakeup = 1;
+            }
+
+            ActiveTimer = 180;
+        }
+
+        if(NoShockCnt >= 120)
+        {
+            HaveAlarmGprsType |= HAVE_SHOCK_ALARM;
+            printf("Shock Actived, Need send gprs alarm\r\n");
+
+            if(Flag.ModuleSleep)
+            {
+                WakeUpType = 3;
+                Flag.ModuleSleep = 0;
+                Flag.ModuleWakeup = 1;
+                ActiveTimer = 180;
+                Flag.RtcInterrupt = 1;
+            }
+        }
 
         NoShockCnt = 0;
     }
@@ -516,7 +521,7 @@ void EXTI4_15_IRQHandler(void)
     if (LL_EXTI_IsActiveRisingFlag_0_31(LL_EXTI_LINE_15) != RESET)
     {
         LL_EXTI_ClearRisingFlag_0_31(LL_EXTI_LINE_15);
-        Flag.NeedShutDown = 0;
+        Flag.NeedDeviceRst = 1;
     }
 }
 

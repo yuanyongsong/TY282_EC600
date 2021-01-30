@@ -14,9 +14,8 @@
 #define RED_OFF   		        LL_GPIO_ResetOutputPin(GPIOA,LL_GPIO_PIN_12)			
 #define RED_NEG   		        LL_GPIO_IsInputPinSet(GPIOA,LL_GPIO_PIN_12)? LL_GPIO_ResetOutputPin(GPIOA,LL_GPIO_PIN_12):LL_GPIO_SetOutputPin(GPIOA,LL_GPIO_PIN_12)
 
-#define GREEN_ON    	        LL_GPIO_SetOutputPin(GPIOA,LL_GPIO_PIN_11)					
-#define GREEN_OFF   	        LL_GPIO_ResetOutputPin(GPIOA,LL_GPIO_PIN_11)		
-#define GREEN_NEG   	        LL_GPIO_IsInputPinSet(GPIOA,LL_GPIO_PIN_11)? LL_GPIO_ResetOutputPin(GPIOA,LL_GPIO_PIN_11):LL_GPIO_SetOutputPin(GPIOA,LL_GPIO_PIN_11)
+#define GREEN_ON    	        LL_TIM_OC_SetCompareCH4(TIM1, 499);						
+#define GREEN_OFF   	        LL_TIM_OC_SetCompareCH4(TIM1, 0);		
 
 #define KEY0                    LL_GPIO_IsInputPinSet(GPIOA,LL_GPIO_PIN_0)
 #define CHRG_STAT               LL_GPIO_IsInputPinSet(GPIOB,LL_GPIO_PIN_14)
@@ -54,9 +53,8 @@ extern unsigned char KeyPwrActCnt;
 extern unsigned char ledCnt;
 extern unsigned char SysPoweKeyCnt;
 extern unsigned char SysPoweKeyTimer;
-extern unsigned char KeyShocksTimer;	
-extern unsigned char ValidShocksCnt;       
-extern unsigned char SignalShockKeepCnt;	
-extern unsigned char DevPerWakeUpCnt;
-
+extern unsigned char KeyShocksTimer;
+extern short         BreathCnt;
+extern unsigned char BreathDir;
+extern unsigned short BreathData;		
 #endif

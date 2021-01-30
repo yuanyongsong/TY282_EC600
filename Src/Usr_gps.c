@@ -8,7 +8,8 @@ unsigned short DegreeValue;  //保存首次用于角度变化判断的值，只�
 unsigned char HaveMoveCnt;   //判断位移变化时，连续几次变化超过值才确认
 unsigned char HaveDegreeCnt; //判断角度变化时，连续几次变化超过值才确认
 unsigned short NoGpsTime;	//GPS开启，但是没有定位到计时
-unsigned char VehSta[4];	 //天琴协议里4字节车辆状态
+unsigned short VehSta;	 	//车辆状态
+unsigned short HaveAlarmGprsType;	//告警状态
 
 char HandTBuf[7] = {0};   //有加时区 bcd时间 hhmmss
 char HandDBuf[7] = {0};   //有加时区 bcd日期 YYMMDD
@@ -1191,7 +1192,7 @@ void GPS_DataProcess(char *pSrc)
 						}
 						else if (DegreeHandle())
 						{
-						//	Flag.OtherSendPosi = 1;
+							Flag.OtherSendPosi = 1;
 						}
 					}
 					else
@@ -1211,7 +1212,7 @@ void GPS_DataProcess(char *pSrc)
 						//保存过堵车经纬度后，判断位移是否超过200米
 						else if (MoveHandle())
 						{
-						//	Flag.OtherSendPosi = 1;
+							Flag.OtherSendPosi = 1;
 							HaveMoveCnt = 0;
 							//超过规定位移，更新基准点
 							MoveData.LatSetted = GPS_GetDegreeFrmStr(LatitudeBuff, 0);

@@ -13,9 +13,7 @@ unsigned char NeedModuleReset;
 unsigned int  NoShockCnt;		//没有振动计时，用于处理地下停车场长期无网络时不循环重启模块问题及进入深度睡眠
 unsigned char ModePwrDownCnt;	//执行关机操作后等待模块回应关机消息倒计时
 unsigned char CheckModeCnt;		//模块开机后，等待主动上报内容，超过10秒，跳过等待，直接开始发送AT指令
-unsigned char WorkMode;			//挖掘机工作模式：1为静止模式，2为怠速模式，3为工作模式
-unsigned short IdlingKeepTime;	//怠速持续时间，超过5分钟认为是进入工作状态
-const unsigned char SoftwareBuilt[50] = {0};
+char SoftwareBuilt[50] = {0};
 char Edition[50] = {0};
 
 
@@ -52,8 +50,8 @@ int main(void)
 	time_convert();
 	Usr_InitHardware();
 	printf("\r\n============================================");
-	printf("\r\n================w609_EC600S=================");
-	sprintf(Edition, "w609_EC600S_%s%s%s%s%s", Built_year, Built_mon, Built_day, Built_hour, Built_min);
+	printf("\r\n================w282_EC600S=================");
+	sprintf(Edition, "w282_EC600S_%s%s%s%s%s", Built_year, Built_mon, Built_day, Built_hour, Built_min);
 	printf("\r\n==software built time:%s %s==", __DATE__, __TIME__);
 	printf("\r\n============================================\r\n");
 	Usr_InitValue();
@@ -62,7 +60,9 @@ int main(void)
 		Usr_DeviceContral();
 		UART_Handle();
 		WIRELESS_Handle();
+		GPIO_Hand();
 		GPS_Handle();
+		GPRS_SaveBreakPoint();
 		FS_UpdateValue();
 		Flag_Check();
 		WatchDogCnt = 0;
@@ -83,12 +83,14 @@ void Usr_InitHardware(void)
 	GPIO_init();
 	UART_Init();
 	TIMER_Init();
+	Pwm_TIM1_Init();
 	IIC_Init();
 
 	//注意这里，ADC从停止模式唤醒时，不需要再次初始化
 	if(Flag.Insleeping == 0)
 	{
-		Adc_init();
+//		Adc_init();
+		MX_Adc_init();
 	}
 }
 
@@ -114,12 +116,14 @@ void Usr_InitValue(void)
 	Flag.NeedcheckCCID = 1;
 	Flag.NeedReloadAgps = 1;
 	Flag.NeedGetMccMnc = 1;
+	Flag.NeedSendCimi = 1;
+//	Flag.NeedSendCnum = 1;
 	AT_CBC_IntervalTemp = 20;
 //	Flag.NeedScanWifi = 1;
 	GprsSend.handFlag = 1;		//开机时需要先发送一个心跳包，在设备连接上平台时就可以发送一个数据
 
 	ActiveTimer = ACTIVE_TIME;
-	WorkMode = 2;				//设备开机认为是在怠速状态
+
 	AtType = AT_NULL;
 	Flag.WaitAtAck = 0;
 	WatchDogCnt = 0;
@@ -172,13 +176,41 @@ void Usr_InitValue(void)
 		Fs.Sensor = 0x4;
 	}
 
+	if (Fs.Interval == 0 || Fs.Interval == 0xffffffff)
+	{
+		Fs.Interval = 3600;
+		Flag.NeedUpdateFs = 1;
+	}
+	
+	//读取到的关键参数合法性判断
+	if(strlen(Fs.IpAdress) < 5)			
+	{
+		memset(Fs.IpAdress,0,sizeof(Fs.IpAdress));
+		memset(Fs.IpPort,0,sizeof(Fs.IpPort));
+
+		strcpy(Fs.IpAdress,"47.101.151.253");
+		strcpy(Fs.IpPort,"7788");
+
+		Flag.NeedUpdateFs = 1;
+	}
+
+
 	memset(UserIDBuf,0, sizeof(UserIDBuf));
 	strncpy(UserIDBuf,Fs.UserID, sizeof(UserIDBuf)); 
 
 	//以下是需要获取到配置参数才能初始化的设备外设
+//	Fs.Interval = 15;
+	if(Fs.Interval <=120)
+	{
+		Flag.NoSleepMode = 1;			//小于2分钟时，低功耗模式已经没有优势，不进入休眠
+	}
+	else
+	{
+		RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
+	}
 
-	RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
 
+	//以下是需要获取到配置参数才能初始化的设备外设
 	if(G_Sensor_init())
 	{
 		Flag.GsensorInitOk = 1;
@@ -188,21 +220,12 @@ void Usr_InitValue(void)
 	{
 		printf("G sensor init failed\r\n");
 	}
-<<<<<<< HEAD
-
-	if(G_Sensor_init())
-	{
-		printf("G sensor init ok\r\n");
-	}	
 
 	if(Fs.ModeSet & NO_SENSOR)
 	{
 		G_Sensor_Pwr(0);		
 	}
 
-=======
-	
->>>>>>> cfc6897120fc08673b392d5bd1225f628af94601
 }
 
 void Flag_Check(void)
@@ -217,9 +240,35 @@ void Flag_Check(void)
 
 	if(Flag.NeedGetBatVoltage)
 	{
+		static u16 lowbatalarmcnt = 0;
+
 		Flag.NeedGetBatVoltage = 0;
 		BatVoltage_Adc = (u32)Adc_Value_Get();
-		BatVoltage_Adc = (u16)(BatVoltage_Adc * 478/100);		//转换成电池电压,1M和270k分压，采样值*（1.27/0.27）=采样值*4.7,修正到4.78
+//		BatVoltage_Adc = (u16)(BatVoltage_Adc * 478/100);		//转换成电池电压,1M和270k分压，采样值*（1.27/0.27）=采样值*4.7,修正到4.78
+		BatVoltage_Adc = (u16)(BatVoltage_Adc * 280/100);		//转换成电池电压,470k和270k分压，采样值*（74/27）=采样值*2.74,修正到2.8
+		
+		if(BatVoltage_Adc <= 3750)
+		{
+			lowbatalarmcnt ++;
+			if(lowbatalarmcnt > 10)
+			{
+				Flag.BattLow = 1;
+				
+				if(!Flag.HaveSendLowPower)
+				{
+					Flag.HaveSendLowPower = 1;
+					HaveAlarmGprsType |= HAVE_LOWPWR_ALARM;
+					printf("Low Battary power, Need send gprs alarm\r\n");
+				}
+				
+			}
+		}
+		else if(BatVoltage_Adc > 3850)
+		{
+			lowbatalarmcnt = 0;
+			Flag.BattLow = 0;
+		}
+
 		printf("\r\nThe battery voltage is %d mv\r\n",BatVoltage_Adc);
 	}
 
@@ -246,6 +295,7 @@ void Flag_Check(void)
 	if(Flag.GsensorNeedInit)
 	{
 		Flag.GsensorNeedInit = 0;
+
 		if(G_Sensor_init())
 		{
 			Flag.GsensorInitOk = 1;

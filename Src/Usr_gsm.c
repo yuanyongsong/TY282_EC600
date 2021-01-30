@@ -54,7 +54,7 @@ void Usr_ModuleGoSleep(void)
 	// 	printf("Auto shut down!\r\n");
 	// }
 
-	if(WorkMode == 1)
+	if(NoShockCnt > 300)
 	{
 	#if DEEP_SLEEP_MODE
 		printf("\r\nsystem go to deep sleep!\r\n");
@@ -75,9 +75,9 @@ void Usr_ModuleGoSleep(void)
 	Sys_Setting_Before_StopMode();
 
 	Flag.Insleeping = 1;						//在要进入休眠时再置位该标志
-	ValidShocksCnt = 0;
+
 sleep:
-	#if 1
+	#if 0
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
 	LL_LPM_EnableDeepSleep();
 	__WFI();
@@ -103,16 +103,9 @@ sleep:
 		delay_ms(10);		
 	}
 
-	while(DevPerWakeUpCnt > 0)
-	{
-		delay_ms(10);
-	}
-
-	if(!Flag.ModuleWakeup)								//如果没有成功唤醒
+	if(!Flag.ModuleWakeup)			//如果按键按下没超过三秒
 	{
 		SysPoweKeyTimer = 0;
-		ValidShocksCnt = 0;				//清除有效触发次数
-		Flag.DevPreWakeUp = 0;			//清除预唤醒状态，让系统重新回到休眠模式
 		goto sleep;
 	}
 	
@@ -367,7 +360,7 @@ void Usr_Device_ShutDown(void)
 	Flag.SysShutDown = 1;
 
 stop:
-	#if 0
+	#if 1
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
 	LL_LPM_EnableDeepSleep();
 	__WFI();

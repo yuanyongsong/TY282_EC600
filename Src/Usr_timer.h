@@ -45,6 +45,8 @@ void delay_ms(unsigned int ms);
 u8 CompareAgpsRct(Rtc_st RtcNow, Rtc_st RtcBackUp);
 void UTCToBeijing(Rtc_st RtcTemp);
 void RTC_Close(void);
+void Pwm_TIM14_Init(void);
+void Pwm_TIM1_Init(void);
 #endif
 
 

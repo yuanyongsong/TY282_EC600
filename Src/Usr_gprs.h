@@ -8,13 +8,16 @@
 #define	STATUS_GPS_S		((u32)0x00000004)	//位置信息包车辆状态GPS 0 北纬 1 南纬
 #define	STATUS_GPS_W		((u32)0x00000008)	//位置信息包车辆状态GPS 0 东经 1 西经
 
+#define HAVE_LOWPWR_ALARM	0x0001
+#define HAVE_SHOCK_ALARM	0x0004
+
 #ifndef _GPRS_TYPE
 #define _GPRS_TYPE
 
 typedef enum{
 	GPRS_NULL,
 	LOGIN,DATA,BKDATA,UPGRESULT,AGPSDATA,
-	HAND
+	HAND,RESPDATA,DEVINFODATA,
 }GPRS_TYPE;
 	
 #endif
@@ -67,6 +70,8 @@ extern char CCID[21];
 extern char IMEI[16];	
 extern char Lac[5];
 extern char Cid[9];
+extern char IMSI[20];
+extern char SIMNUMB[20];
 extern char Wifi_Content[200];
 extern u32  speed_gprs;
 extern u8   WifiCnt;

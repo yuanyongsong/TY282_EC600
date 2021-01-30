@@ -40,9 +40,9 @@
 #include "MD5.h"
 
 
-#define SENSOR_HIGH         4
-#define SENSOR_NORMAL       6
-#define SENSOR_LOW          8
+#define SENSOR_HIGH         40
+#define SENSOR_NORMAL       60
+#define SENSOR_LOW          80
 
 #define NO_SENSOR           0x01
 #define AUTO_SHUTDOWN       0x02
@@ -158,6 +158,8 @@ typedef struct FLAG_
 	unsigned char ModuleWakeup:1;	  //模块退出休眠
 	unsigned char Insleeping:1 ;       //设备处于休眠状态，只是中途唤醒
 	unsigned char IrNoNeedWakeUp:1;	  //红外从休眠模式退出时不需要唤醒系统
+	unsigned char GsensorNeedInit:1;  //需要初始化Gsnesor
+	unsigned char GsensorInitOk:1;	  //Gsensor初始化成功
 	unsigned char IsContextAct:1;	  //置位表示场景被激活
 	unsigned char HaveSmsReady:1;	  //已经出现READY,再次出现ready时不重新走初始化AT流程
 	unsigned char AtInitCmd:1;
@@ -210,6 +212,7 @@ typedef struct FLAG_
 	unsigned char NeedLogIn:1;					//需要发送登入包
 	unsigned char NeedChangeSoftSim:1;			//需要修改softsim卡号
 	unsigned char InCharging:1;					//设备出于充电状态
+	unsigned char ChargeOver:1;					//设备充满电
 	unsigned char SensorLed:1;					//传感器指示sensor灯，为1时表示需要亮一下
 
 	unsigned char SysShutDown:1;				//系统关机
@@ -247,6 +250,13 @@ typedef struct FLAG_
 	
 	unsigned char DeviceInSetting:1;			//设备出于设置模式
 
+	unsigned char NeedSendCimi:1;				//需要查询IMSI
+	unsigned char NeedSendCnum:1;				//需要查询SIM卡卡号
+	unsigned char HaveSendLowPower:1;			//已经发送低电告警短信，未充电无需再次发送
+	unsigned char NeedRspGprs:1;				//需要应答设置上传时间间隔指令
+	unsigned char NeedRspDevInfo:1;				//需要应答设备信息
+	unsigned char NeedLocateByGprs:1;			//平台下发需要定位指令
+
 }FLAG;
 #endif
 
@@ -259,8 +269,6 @@ extern unsigned char  CheckModeCnt;
 extern unsigned int  NoShockCnt;
 extern unsigned char ModePwrDownCnt;
 extern unsigned short WaitAtTime;
-extern unsigned char WorkMode;	
-extern unsigned short IdlingKeepTime;
 extern char Edition[50];
 
 void Usr_ModuleWakeUp(void);

@@ -27,7 +27,8 @@ extern unsigned char OpenGpsEorCnt;
 extern unsigned char RecGpsCnt;
 extern unsigned short  NoGpsTime;
 
-extern unsigned char VehSta[];           //天琴协议里4字节车辆状态
+extern unsigned short VehSta;           	//车辆状态
+extern unsigned short HaveAlarmGprsType;	
 
 extern char HandTBuf[];     //当前时区 bcd时间 hhmmss
 extern char HandDBuf[];     //当前时区 bcd日期 YYMMDD

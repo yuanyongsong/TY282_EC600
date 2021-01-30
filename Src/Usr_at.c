@@ -96,7 +96,9 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 	case AT_CSMP:
 		strcpy(pDst, "AT+CSMP=17,167,0,0\r\n"); 
 		break;
-
+	case AT_ATI:
+		strcpy(pDst, "ATI\r\n"); 
+		break;
 	case AT_CNMI:
 		strcpy(pDst, "AT+CNMI=2,1\r\n");
 		break;
@@ -164,7 +166,13 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		{
 			sprintf(pDst, "AT+QIOPEN=1,0,\"TCP\",\"%s\",%s,0,1\r\n", Fs.UbloxIp, Fs.UbloxPort);
 			Flag.ConUblox = 1;
-		}		
+		}
+		else
+		{
+			sprintf(pDst, "AT+QIOPEN=1,1,\"TCP\",\"%s\",%s,0,1\r\n", Fs.IpAdress, Fs.IpPort);
+			Flag.ConNet = 1;
+		}
+		
 		TIMER_AtDelay(2);
 		break;
 
@@ -174,6 +182,16 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 			GprsType = AGPSDATA;
 			GprsDataLen = WIRELESS_GprsSendPacket(GprsType);
 			sprintf(pDst, "AT+QISEND=0,%d\r\n", GprsDataLen);	
+		}
+		else if (GprsType != BKDATA)
+		{
+			GprsDataLen = WIRELESS_GprsSendPacket(GprsType);
+			sprintf(pDst, "AT+QISEND=1,%d\r\n", GprsDataLen);	
+		}
+		else
+		{
+			GprsDataLen = Breakpointleng;
+			sprintf(pDst, "AT+QISEND=1,%d\r\n", Breakpointleng);
 		}
 		break;
 
@@ -275,38 +293,17 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		break;
 
 	case AT_QHTTPURL:
-		strcpy(pDst, "AT+QHTTPURL=36,80\r\n"); 			//设置链接地址长度及超时时间
+		strcpy(pDst, "AT+QHTTPURL=47,80\r\n"); 			//设置链接地址长度及超时时间
 		TIMER_AtDelay(3);
 		break;
 
 	case AT_HTTPURL:
-		strcpy(pDst, "https://www.zzhb.org.cn/gas/e/report\r\n"); 	//发送链接
+		strcpy(pDst, "http://47.101.151.253:12306/common/downFirmware\r\n"); 	//发送链接
 		TIMER_AtDelay(3);
 		break;
 
 	case AT_QHTTPGET:
 		strcpy(pDst, "AT+QHTTPGET=80\r\n"); 			//get链接内容
-		TIMER_AtDelay(3);
-		break;
-
-	case AT_QHTTPCFG:									//设置用户去配置消息头内容
-		strcpy(pDst, "AT+QHTTPCFG=\"requestheader\",1\r\n"); 			
-		TIMER_AtDelay(3);
-		break;
-
-	case AT_QHTTPPOST:									//向网页post数据
-		GprsDataLen = WIRELESS_GprsSendPacket(GprsType);
-		sprintf(pDst, "AT+QHTTPPOST=%d,30,30\r\n",GprsDataLen); 			
-		TIMER_AtDelay(3);
-		break;
-
-	case AT_HTTPPOST:									//向网页post数据
-		sprintf(pDst, "%s\r\n",GprsSendBuf); 			
-		TIMER_AtDelay(3);
-		break;
-
-	case AT_QHTTPREAD:
-		strcpy(pDst, "AT+QHTTPREAD=80\r\n"); 			//读取发送结果
 		TIMER_AtDelay(3);
 		break;
 
@@ -330,6 +327,14 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		TIMER_AtDelay(3);
 		break;
 
+	case AT_CNUM:
+		strcpy(pDst, "AT+CNUM\r\n");
+		break;
+
+	case AT_CIMI:
+		strcpy(pDst, "AT+CIMI\r\n");
+		break;
+
 	default:
 		break;
 	}
@@ -350,6 +355,10 @@ unsigned char AT_InitReceive(AT_TYPE *temType, char *pSrc)
 		}
 		else if (*temType == AT_AT)
 		{
+			*temType = AT_ATI;
+		}	
+		else if (*temType == AT_ATI)
+		{
 			*temType = AT_CLIP;
 		}		
 		else if (*temType == AT_CLIP)
@@ -365,6 +374,10 @@ unsigned char AT_InitReceive(AT_TYPE *temType, char *pSrc)
 			*temType = AT_CNMI;
 		}
 		else if (*temType == AT_CNMI)
+		{
+			*temType = AT_CGREG_SET;
+		}
+		else if (*temType == AT_CGREG_SET)
 		{
 			*temType = AT_CGSN;
 		}
@@ -492,11 +505,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 	case AT_CGREG:
 		if (strstr(pSrc, "+CGREG:"))
 		{
-<<<<<<< HEAD
 			if (strstr(pSrc, "2,1,") || strstr(pSrc, "2,5,"))
-=======
-			if (strstr(pSrc, ",1") || strstr(pSrc, ",5"))
->>>>>>> cfc6897120fc08673b392d5bd1225f628af94601
 			{
 
 				if ((Flag.PsSignalChk && Flag.GprsConnectOk) || (ConnectDelayCnt > 0))
@@ -505,7 +514,29 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 				}
 				else
 				{
-					*temType = AT_QICSGP;
+					*temType = AT_QISTATE;
+				}
+
+				//获取基站LAC
+				p1 = strstr(pSrc, "\"");
+				p1 ++;
+				ptem = strstr(p1, "\"");
+				if((ptem - p1) == 4)
+				{
+					memset(Lac,0,sizeof(Lac));
+					strncpy(Lac,p1,ptem - p1);
+				}
+
+				p1 = ptem + 1;
+
+				//获取基站CID
+				p1 = strstr(p1, "\"");
+				p1 ++;
+				ptem = strstr(p1, "\"");
+				if((ptem - p1) <= 8)
+				{
+					memset(Cid,0,sizeof(Cid));
+					strncpy(Cid,p1,ptem - p1);
 				}
 
 				Flag.PsSignalOk = 1; 
@@ -584,15 +615,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 		if (strstr(pSrc, "OK"))
 		{
 			Flag.IsContextAct = 1;
-			if (Flag.AskUbloxData)
-			{
-				*temType = AT_QIOPEN;
-			}
-			else
-			{
-				*temType = AT_QHTTPCFG;
-			}
-			
+			*temType = AT_QIOPEN;
 			AtDelayCnt = 0;
 			back = 1;
 		}
@@ -601,7 +624,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			back = 1;
 			AtDelayCnt = 0;
 			if (Flag.IsContextAct) //场景已经激活
-				*temType = AT_QHTTPCFG;
+				*temType = AT_QIOPEN;
 			else
 			{
 				*temType = AT_NULL;
@@ -700,17 +723,38 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 		break;
 
 	case AT_QIOPEN:
-		if (strstr(pSrc, "+QIOPEN: 0,0"))
+	#if 1
+		if (strstr(pSrc, "+QIOPEN: 1,0"))
+		{
+			Flag.GprsConnectOk = 1;
+			AtError.GprsConnectEorCnt = 0;
+			*temType = AT_NULL;
+			error3 = 0;
+			back = 1;
+		}
+	#else
+		if (strstr(pSrc, "OK"))
+		{
+			Flag.GprsConnectOk = 1;
+			AtError.GprsConnectEorCnt = 0;
+			*temType = AT_NULL;
+			error3 = 0;
+			back = 1;
+		}
+	#endif
+		else if (strstr(pSrc, "+QIOPEN: 0,0"))
 		{
 			*temType = AT_QISEND;
 			AtDelayCnt = 0;
 			error3 = 0;
 			back = 1;
 		}
+	#if 1
 		else if ((strstr(pSrc, "OK")) && (strstr(pSrc, "+QIOPEN:") == NULL))
 		{
 			back = 0;
 		}
+	#endif
 		else if (strstr(pSrc, "+QIOPEN: 1,563")) //有时会出现
 		{
 			*temType = AT_QICLOSE;
@@ -819,7 +863,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			}
 
 			//如果是休眠期间周期性唤醒时上传数据成功，ActiveTimer = 2即刻进入休眠
-			if(((Flag.Insleeping) || (GprsSend.posCnt == 0)) && (!Flag.NoSleepMode))
+			if(((Flag.Insleeping) && (GprsType == DATA)) && (!Flag.NoSleepMode))
 			{
 				ActiveTimer = 5;
 			}	
@@ -883,7 +927,7 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 
 		if (!Flag.GprsConnectOk)	//如果是开机时，先获取AGPS数据，获取完成之后就开始连接服务器
 		{
-			*temType = AT_QHTTPCFG;
+			*temType = AT_QIOPEN;
 		}
 		else
 		{
@@ -1261,130 +1305,23 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			AtDelayCnt = 0;
 			*temType = AT_NULL;			
 		}
-<<<<<<< HEAD
-=======
-	break;
-
-	case AT_QHTTPCFG:
-		if(strstr(pSrc, "OK") != NULL)
-		{
-			*temType = AT_QHTTPURL;
-			back = 1;
-			AtDelayCnt = 0;
-		}	
-		else if (strstr(pSrc, "ERROR"))
-		{
-			*temType = AT_NULL;
-			AtError.GprsConnectEorCnt++;
-			back = 1;
-		}
->>>>>>> cfc6897120fc08673b392d5bd1225f628af94601
 	break;
 
 	case AT_QHTTPURL:
 		if(strstr(pSrc, "CONNECT") != NULL)
 		{
+			Flag.IsUpgrate = 1;
 			*temType = AT_HTTPURL;
 			back = 1;
 			AtDelayCnt = 0;
 		}
-		else if (strstr(pSrc, "ERROR"))
-		{
-			*temType = AT_NULL;
-			AtError.GprsConnectEorCnt++;
-			back = 1;
-		}
+
 		break;
 
 	case AT_HTTPURL:
 		if(strstr(pSrc, "OK") != NULL)
 		{
-			Flag.GprsConnectOk = 1;
-			*temType = AT_NULL;
-			error3 = 0;
-			back = 1;
-			AtDelayCnt = 0;
-		}
-		else
-		{
-			ConnectDelayCnt = 15;
-			*temType = AT_NULL;
-			error3++;
-			if (error3 > 5)
-			{
-				error3 = 0;
-				NeedModuleReset = CONNECT_SERVICE_FAILED;
-			}
-			back = 1;			
-		}
-		break;
-
-	case AT_QHTTPPOST:
-		if(strstr(pSrc, "CONNECT") != NULL)
-		{
-			*temType = AT_HTTPPOST;
-			error1 = 0;
-			back = 1;
-			AtDelayCnt = 0;
-		}
-		else if (strstr(pSrc, "ERROR"))
-		{
-			Flag.NeedCloseGprs = 1;
-
-			error1++;
-			if (error1 > 5)
-			{
-				error1 = 0;
-				NeedModuleReset = CONNECT_SERVICE_FAILED;
-			}
-
-			back = 1;
-			*temType = AT_NULL;
-		}
-		else
-		{
-			back = 1;
-			AtDelayCnt = 0;
-			*temType = AT_NULL;			
-		}
-		break;
-
-	case AT_HTTPPOST:
-		if(strstr(pSrc, "+QHTTPPOST: 0,200") != NULL)
-		{
-			*temType = AT_QHTTPREAD;
-			error2 = 0;
-			back = 1;
-			AtDelayCnt = 0;
-
-			//如果是有gps情况下发送的数据包，那么数据包有效，就可以直接进入休眠
-			if(Flag.Insleeping && Flag.HaveGPS)
-			{
-				ActiveTimer = 3;
-			}
-		}
-		else if (strstr(pSrc, "OK"))
-		{
-			back = 0;
-		}
-		else 
-		{
-			error2++;
-			if (error2 > 5)
-			{
-				error2 = 0;
-				NeedModuleReset = 2;
-			}
-
-			*temType = AT_NULL;
-			back = 1;
-		}
-		break;
-
-	case AT_QHTTPREAD:
-		if(strstr(pSrc, "+QHTTPREAD:") != NULL)
-		{
-			*temType = AT_NULL;
+			*temType = AT_QHTTPGET;
 			back = 1;
 			AtDelayCnt = 0;
 		}
@@ -1444,6 +1381,43 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 		}
 		break;
 
+	case AT_CNUM:
+		if(strstr(pSrc, "+CNUM:") != NULL)
+		{
+			memset(SIMNUMB,0,sizeof(SIMNUMB));
+			p1 = strstr(pSrc, "+CNUM:");
+			p1 += 6;
+			ptem = strstr(p1, "\r\n");
+
+			if(ptem - p1 < sizeof(SIMNUMB))
+			{
+				strncpy(SIMNUMB, p1, ptem - p1);
+			}
+			
+			*temType = AT_NULL;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+	break;
+		
+	case AT_CIMI:
+		if(strstr(pSrc, "OK") != NULL)
+		{
+			memset(IMSI,0,sizeof(IMSI));
+			p1 = strstr(pSrc, "\r\n");
+			p1 += 2;
+			ptem = strstr(p1, "\r\n");
+
+			if(ptem - p1 < sizeof(IMSI))
+			{
+				strncpy(IMSI, p1, ptem - p1);
+			}
+
+			*temType = AT_NULL;
+			back = 1;
+			AtDelayCnt = 0;
+		}
+		break;
 	
 	default:
 		break;
@@ -1586,6 +1560,20 @@ void Flag_check(void)
 		return;
 	}
 
+	if(Flag.NeedSendCimi)
+	{
+		Flag.NeedSendCimi = 0;
+		AtType = AT_CIMI;
+		return;
+	}
+
+	if(Flag.NeedSendCnum)
+	{
+		Flag.NeedSendCnum = 0;
+		AtType = AT_CNUM;
+		return;
+	}
+
 	if (AtError.GprsConnectEorCnt > 10)
 	{
 		AtError.GprsConnectEorCnt = 0;
@@ -1593,11 +1581,14 @@ void Flag_check(void)
 		return;
 	}
 
-	if ((Flag.NeedReloadAgps && Flag.IsContextAct)&&(Fs.LongitudeLast[0] != 0xFF)&&(Fs.LongitudeLast[0] != 0))
+	if ((Flag.NeedReloadAgps && Flag.ConNet)&&(Fs.LongitudeLast[0] != 0xFF)&&(Fs.LongitudeLast[0] != 0))
 	{
 		Flag.NeedReloadAgps = 0;
 		Flag.AskUbloxData = 1;
-		AtType = AT_QIOPEN;
+		if (!Flag.IsContextAct)
+			AtType = AT_QICSGP;
+		else
+			AtType = AT_QIOPEN;
 		return;
 	}
 
