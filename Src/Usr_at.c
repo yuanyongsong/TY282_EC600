@@ -108,8 +108,8 @@ void AT_SendPacket(AT_TYPE temType, char *pDst)
 		break;
 
 	case AT_QCFG:
-		strcpy(pDst, "AT+QCFG=\"urc/ri/other\",\"off\",120\r\n"); //关闭有网络上报时RI脚电平变化
-	//	strcpy(pDst, "AT+QCFG=\"urc/ri/other\",\"pulse\",200\r\n");			//开启有网络上报时RI脚电平变化
+	//	strcpy(pDst, "AT+QCFG=\"urc/ri/other\",\"off\",120\r\n"); //关闭有网络上报时RI脚电平变化
+		strcpy(pDst, "AT+QCFG=\"urc/ri/other\",\"pulse\",200\r\n");			//开启有网络上报时RI脚电平变化
 		break;
 
 	case AT_CREG:
@@ -624,7 +624,8 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			back = 1;
 			AtDelayCnt = 0;
 			if (Flag.IsContextAct) //场景已经激活
-				*temType = AT_QIOPEN;
+//				*temType = AT_QIOPEN;
+				*temType = AT_QIDEACT;
 			else
 			{
 				*temType = AT_NULL;
@@ -755,14 +756,28 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			back = 0;
 		}
 	#endif
-		else if (strstr(pSrc, "+QIOPEN: 1,563")) //有时会出现
+//		else if (strstr(pSrc, "+QIOPEN: 1,563")) //有时会出现
+		else if (strstr(pSrc, "+QIOPEN: 1,"))	//有错误的时候
 		{
 			*temType = AT_QICLOSE;
 			back = 1;
+
+			error3++;
+
+			if (Flag.AskUbloxData)
+			{
+				Flag.AskUbloxData = 0;
+			}
+
+			if (error3 > 5)
+			{
+				error3 = 0;
+				NeedModuleReset = CONNECT_SERVICE_FAILED;
+			}
 		}
 		else
 		{
-			ConnectDelayCnt = 15;
+			ConnectDelayCnt = 5;
 			*temType = AT_NULL;
 			error3++;
 
@@ -862,8 +877,9 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 				WaitUbloxCnt = 10;		//发送成功后，等待10秒，如果超时未收到，断开AGPS链接
 			}
 
-			//如果是休眠期间周期性唤醒时上传数据成功，ActiveTimer = 2即刻进入休眠
-			if(((Flag.Insleeping) && (GprsType == DATA)) && (!Flag.NoSleepMode))
+			//如果是休眠期间唤醒上传数据，ActiveTimer = 5即刻进入休眠
+			if(((Flag.Insleeping) && (!Flag.NoSleepMode) && !Flag.InRealTimeLocate))
+//			if(((GprsType == DATA)) && (!Flag.NoSleepMode))
 			{
 				ActiveTimer = 5;
 			}	
@@ -1149,8 +1165,12 @@ unsigned char AT_Receive(AT_TYPE *temType, char *pSrc)
 			ptem = strchr(p1, ',');
 
 			if(ptem == NULL)
-			break;
-
+			{
+				*temType = AT_NULL;
+				back = 1;
+				break;
+			}
+			
 			strncpy(temp, p1, (ptem - p1));
 			i = Usr_Atoi(temp);
 			Rssi = i;

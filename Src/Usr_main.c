@@ -206,7 +206,8 @@ void Usr_InitValue(void)
 	}
 	else
 	{
-		RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
+//		RTC_Wake_Init(60);				//1分钟产生一次闹钟事件
+		RTC_Wake_Init(90);				//实测发现设置成90时大概60秒一次RTC中断
 	}
 
 

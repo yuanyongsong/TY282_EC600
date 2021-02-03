@@ -243,20 +243,21 @@ void GPIO_init(void)
     NVIC_SetPriority(EXTI2_3_IRQn, 3);
     NVIC_EnableIRQ(EXTI2_3_IRQn);
 
-
+#if USE_IR
     //模块数据接收中断
     LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTC, LL_EXTI_CONFIG_LINE13);
 
     EXTI_InitStruct.Line_0_31 = LL_EXTI_LINE_13;
     EXTI_InitStruct.LineCommand = ENABLE;
     EXTI_InitStruct.Mode = LL_EXTI_MODE_IT;
-    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING;
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
     LL_GPIO_SetPinPull(GPIOC, LL_GPIO_PIN_13, LL_GPIO_PULL_DOWN);
     LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_13, LL_GPIO_MODE_INPUT);
     NVIC_SetPriority(EXTI4_15_IRQn, 2);
     NVIC_EnableIRQ(EXTI4_15_IRQn);
+#endif
 
     RED_ON;
     MODULE_WAKEUP_RESET;
@@ -285,19 +286,21 @@ void Exit_GPIO_Interrupt_Init(void)
     NVIC_SetPriority(EXTI0_1_IRQn, 3);
     NVIC_EnableIRQ(EXTI0_1_IRQn);
 
+#if USE_IR
     //模块数据接收中断
     LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTC, LL_EXTI_CONFIG_LINE13);
 
     EXTI_InitStruct.Line_0_31 = LL_EXTI_LINE_13;
     EXTI_InitStruct.LineCommand = ENABLE;
     EXTI_InitStruct.Mode = LL_EXTI_MODE_IT;
-    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING;
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
     LL_GPIO_SetPinPull(GPIOC, LL_GPIO_PIN_13, LL_GPIO_PULL_NO);
     LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_13, LL_GPIO_MODE_INPUT);
     NVIC_SetPriority(EXTI4_15_IRQn, 2);
     NVIC_EnableIRQ(EXTI4_15_IRQn);
+#endif
 }
 
 
@@ -355,7 +358,7 @@ void GPIO_Init_Before_Shutdown(void)
 void StopMode_TurnOff_Some_GPIOs(void)
 {
     LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-//    LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
+    LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
 	LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_ALL);
 
     //不关闭PA13和PA14
@@ -399,6 +402,22 @@ void StopMode_TurnOff_Some_GPIOs(void)
     LL_GPIO_SetPinMode(GPIOD, LL_GPIO_PIN_3, LL_GPIO_MODE_INPUT);
     NVIC_SetPriority(EXTI2_3_IRQn, 2);
     NVIC_EnableIRQ(EXTI2_3_IRQn);
+#endif
+
+#if USE_IR
+    //模块数据接收中断
+    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTC, LL_EXTI_CONFIG_LINE13);
+
+    EXTI_InitStruct.Line_0_31 = LL_EXTI_LINE_13;
+    EXTI_InitStruct.LineCommand = ENABLE;
+    EXTI_InitStruct.Mode = LL_EXTI_MODE_IT;
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_FALLING;
+    LL_EXTI_Init(&EXTI_InitStruct);
+
+    LL_GPIO_SetPinPull(GPIOC, LL_GPIO_PIN_13, LL_GPIO_PULL_NO);
+    LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_13, LL_GPIO_MODE_INPUT);
+    NVIC_SetPriority(EXTI4_15_IRQn, 2);
+    NVIC_EnableIRQ(EXTI4_15_IRQn);
 #endif
 }
 
@@ -484,6 +503,7 @@ void EXTI2_3_IRQHandler(void)
             if(Flag.ModuleSleep)
             {
                 WakeUpType = 3;
+                WakeUpReason = 2;                
                 Flag.ModuleSleep = 0;
                 Flag.ModuleWakeup = 1;
             }
@@ -499,6 +519,7 @@ void EXTI2_3_IRQHandler(void)
             if(Flag.ModuleSleep)
             {
                 WakeUpType = 3;
+                WakeUpReason = 2; 
                 Flag.ModuleSleep = 0;
                 Flag.ModuleWakeup = 1;
                 ActiveTimer = 180;
@@ -513,9 +534,19 @@ void EXTI2_3_IRQHandler(void)
 
 void EXTI4_15_IRQHandler(void)
 {
-    if (LL_EXTI_IsActiveRisingFlag_0_31(LL_EXTI_LINE_13) != RESET)
+    if (LL_EXTI_IsActiveFallingFlag_0_31(LL_EXTI_LINE_13) != RESET)
     {
-        LL_EXTI_ClearRisingFlag_0_31(LL_EXTI_LINE_13);
+        LL_EXTI_ClearFallingFlag_0_31(LL_EXTI_LINE_13);
+//        printf("\r\n----> RI interrupt act! <----\r\n");
+        if(Flag.ModuleSleep)
+        {
+            WakeUpType = 0;         //平台有数据下发时不需要上传定位信息
+            WakeUpReason = 4; 
+            Flag.ModuleSleep = 0;
+            Flag.ModuleWakeup = 1;
+            ActiveTimer = 180;
+            Flag.RtcInterrupt = 1;
+        }
     }
 
     if (LL_EXTI_IsActiveRisingFlag_0_31(LL_EXTI_LINE_15) != RESET)

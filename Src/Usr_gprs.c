@@ -704,7 +704,10 @@ void WIRELESS_GprsReceive(char *pSrc)
 			{
 				Flag.NoSleepMode = 1;			
 			}
-			
+			else
+			{
+				Flag.NoSleepMode = 0;
+			}
 			Flag.NeedUpdateFs = 1;		
 			Flag.NeedRspGprs = 1;		
 		}
@@ -745,6 +748,17 @@ void WIRELESS_GprsReceive(char *pSrc)
 			GprsSend.posCnt = 1;
 			GprsSend.posFlag = 1;
 			Flag.NeedLocateByGprs = 1;
+			Flag.InRealTimeLocate = 1;
+			
+			if(ActiveTimer <= 180)
+			{
+				ActiveTimer += 30;
+			}
+
+			if(Flag.IsGpsOn == 0)
+			{
+				Flag.NeedGpsOpen = 1;
+			}
 		}
 		//自动开关机
 		else if((p0 = strstr(pSrc,"APOF,")) != NULL)

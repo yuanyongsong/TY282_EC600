@@ -427,6 +427,7 @@ void TIMER_SecCntHandle(void)
 		SysPoweKeyTimer ++;
 		if(SysPoweKeyTimer >= 3)
 		{
+			WakeUpReason = 1; 
 			SysPoweKeyTimer = 0;
 			Flag.ModuleWakeup = 1;
 			Flag.ModuleSleep = 0;
@@ -1045,7 +1046,7 @@ void RTC_TAMP_IRQHandler(void)
 	{
 		LL_RTC_ClearFlag_WUT(RTC);
 		LL_EXTI_ClearRisingFlag_0_31(LL_EXTI_LINE_19); 
-//		printf("\r\n----------come to rtc interrupt----------\r\n");
+		printf("\r\n----------come to rtc interrupt----------\r\n");
 
 		WakeupCnt ++;
 		Timestamp += 60;
@@ -1056,6 +1057,11 @@ void RTC_TAMP_IRQHandler(void)
 			NoShockCnt += 60;
 		}
 
+		if(WakeupCnt % 5 == 0)
+		{
+			GprsSend.handFlag = 1;
+		}
+		
 		//如果开启了自动开关机功能，如果在关机时间段内，系统只会周期性唤醒，更新时间戳，不会执行其他操作
 		if((Fs.ModeSet & AUTO_SHUTDOWN) && (Timestamp > 0x50000000))		//确认时间戳已经有效
 		{
@@ -1114,21 +1120,21 @@ void RTC_TAMP_IRQHandler(void)
 			if(WakeupCnt % (Fs.Interval/60) == 0)
 			{
 				WakeUpType = 2;
-				
+				WakeUpReason = 3; 
 				Flag.ModuleSleep = 0;
 				Flag.ModuleWakeup = 1;
 				Flag.IrNoNeedWakeUp = 0;
 				ActiveTimer = 100;
 			}
-			// else if(WakeupCnt % 5 == 0)
-			// {
-			// 	WakeUpType = 1;
+			else if(WakeupCnt % 5 == 0)
+			{
+				WakeUpType = 1;
 
-			// 	Flag.ModuleSleep = 0;
-			// 	Flag.ModuleWakeup = 1;
-			// 	Flag.IrNoNeedWakeUp = 0;
-			// 	ActiveTimer = 100;
-			// }
+				Flag.ModuleSleep = 0;
+				Flag.ModuleWakeup = 1;
+				Flag.IrNoNeedWakeUp = 0;
+				ActiveTimer = 100;
+			}
 
         } 
 

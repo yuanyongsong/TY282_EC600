@@ -253,9 +253,10 @@ typedef struct FLAG_
 	unsigned char NeedSendCimi:1;				//需要查询IMSI
 	unsigned char NeedSendCnum:1;				//需要查询SIM卡卡号
 	unsigned char HaveSendLowPower:1;			//已经发送低电告警短信，未充电无需再次发送
-	unsigned char NeedRspGprs:1;				//需要应答设置上传时间间隔指令
+	unsigned char NeedRspGprs:1;				//需要应答平台下发信息
 	unsigned char NeedRspDevInfo:1;				//需要应答设备信息
 	unsigned char NeedLocateByGprs:1;			//平台下发需要定位指令
+	unsigned char InRealTimeLocate:1;			//实时数据定位标志
 
 }FLAG;
 #endif

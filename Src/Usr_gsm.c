@@ -1,7 +1,7 @@
 #include "usr_main.h"
 
 unsigned char ResetMouldeCnt_1; 	//模块因为没有信号重启次数
-
+unsigned char WakeUpReason;			//设备唤醒原因.1:按键唤醒；2：Gsensor唤醒；3：RTC唤醒；4：RI唤醒
 
 
 //将十进制的字符串转换为十六进制的字符串,最大转换0xFFFFFFFF对应的十进制长度
@@ -19,14 +19,15 @@ void Usr_ModuleGoSleep(void)
 #if DEEP_SLEEP_MODE
 	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup) 	//使用深度休眠
 #else
-	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup || Flag.NoSleepMode) 	//不使用深度休眠
+	//补充，充电时由于需要通过led灯实时显示充电状态，因此设备不能进入休眠
+	if(AT_NULL != AtType ||ActiveTimer || Flag.ModuleWakeup || Flag.NoSleepMode || DC_DET || (FindDeviceCnt > 0)) 	//不使用深度休眠
 #endif
 	{
 		return;
 	}
 
+	Flag.InRealTimeLocate = 0;			//如果ActiveTimer已经减到0，说明已经退出实时定位
 	Flag.ModuleWakeup = 0;
-	Flag.ModuleSleep = 1;
 	Flag.IsGpsOn = 0;
 
 	GREEN_OFF;
@@ -75,9 +76,11 @@ void Usr_ModuleGoSleep(void)
 	Sys_Setting_Before_StopMode();
 
 	Flag.Insleeping = 1;						//在要进入休眠时再置位该标志
+	Flag.RtcInterrupt = 0;
+	Flag.ModuleSleep = 1;
 
 sleep:
-	#if 0
+	#if 1
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
 	LL_LPM_EnableDeepSleep();
 	__WFI();
@@ -133,6 +136,14 @@ void Usr_ModuleWakeUp(void)
 	Flag.NeedUpdateFs = 1;
 	Flag.NeedGetMccMnc = 1;
 	Flag.CsqChk = 1;
+
+	if(WakeUpReason == 1)		printf("Wake up by button\r\n");
+	else if(WakeUpReason == 2)	printf("Wake up by shock\r\n");
+	else if(WakeUpReason == 3)	printf("Wake up by RTC\r\n");
+	else if(WakeUpReason == 4)	printf("Wake up by RI\r\n");
+	else						printf("Wake up by unknow reason\r\n");
+
+	WakeUpReason = 0;
 
 	if((WakeUpType == 2)||(WakeUpType == 3))
 	{
